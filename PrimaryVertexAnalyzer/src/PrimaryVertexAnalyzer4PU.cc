@@ -1,4 +1,5 @@
-#include "Validation/RecoVertex/interface/PrimaryVertexAnalyzer4PU.h"
+//#include "Validation/RecoVertex/interface/PrimaryVertexAnalyzer4PU.h"
+#include "usercode/PrimaryVertexAnalyzer/interface/PrimaryVertexAnalyzer4PU.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -10951,3 +10952,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionRecoNoTracks(std::map<std:
     }
   }
 }  // end of analyzeVertexCollectionRecoNoTracks
+
+//define this as a plug-in
+DEFINE_FWK_MODULE(PrimaryVertexAnalyzer4PU);
