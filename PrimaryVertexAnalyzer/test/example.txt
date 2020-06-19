@@ -1,0 +1,1 @@
+cmsRun cfg/pvt_cfg.py input=/store/relval/CMSSW_11_2_0_pre1/RelValZMM_14/GEN-SIM-RECO/110X_mcRun4_realistic_v3_2026D49noPU-v1/10000/79C28F5A-A01A-8A40-9C5A-95FA87D2E6DD.root events=10 info=RUN4PU_new_A redoPV=True 4D=True era=Phase2 maxEta=4.0 zrange=4. convergence_mode=0 delta_lowT=1e-3 delta_highT=1e-2
