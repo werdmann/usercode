@@ -1621,30 +1621,32 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
     }
 
     // for matched vertices
-    addnSP(h, new TH1F("ntimingvtx", "#timing tracks", 200, 0., 200.));
     addnSP(h, new TH1F("nseltrkvtx", "#selected tracks", 200, 0., 200.));
     addnSP(h, new TH1F("zrecsim","zrec - zsim", 100, -0.1, 0.1));
     addnSP(h, new TH1F("zrecerr","zrec uncertainty", 100, 0.0, 0.01));
     addnSP(h, new TH1F("zrecsimHR","zrec - zsim", 200, -0.02, 0.02));
     addnSP(h, new TH1F("xrecsim","xrec - xsim", 100, -0.01, 0.01));
-    addnSP(h, new TH1F("xrecerr","xrec uncertainty", 100, 0.0, 0.02));
+    addnSP(h, new TH1F("xrecerr","xrec uncertainty", 100, 0.0, 0.01));
     addnSP(h, new TH1F("yrecsim","yrec - ysim", 100, -0.01, 0.01));
-    addnSP(h, new TH1F("yrecerr","yrec uncertainty", 100, 0.0, 0.02));
+    addnSP(h, new TH1F("yrecerr","yrec uncertainty", 100, 0.0, 0.01));
     addnSP(h, new TH1F("zrecsimpull","(zrec - zsim)/error", 100, -10, 10));
     addnSP(h, new TH1F("xrecsimpull","(xrec - xsim)/error", 100, -10, 10));
     addnSP(h, new TH1F("yrecsimpull","(yrec - ysim)/error", 100, -10, 10));
 
-    addnSP(h, new TH1F("trecsim_fromtracks", "vertex time residual from tracks", 200, -1., 1.));
-    addnSP(h, new TH1F("terrvtx_fromtracks", "vertex time error from tracks", 200, 0., 0.1));
-    addnSP(h, new TH1F("trecsimpull_fromtracks", "tpull from tracks", 200, -10., 10.));
-    addnSP(h,
-          new TH1F("trecsim_withtracks", "vertex time residual from vertex", 200, -1., 1.));  //reference for fromtracks
-    addnSP(h, new TH1F("terrvtx_withtracks", "vertex time error from vertex", 200, 0., 0.1));
-    addnSP(h, new TH1F("trecsimpull_withtracks", "tpull from vertex", 200, -10., 10.));
-    
     if (f4D_){
+      addnSP(h, new TH1F("ntimingvtx", "#timing tracks", 200, 0., 200.));
+      addnSP(h, new TH1F("trecsim_fromtracks", "vertex time residual from tracks", 200, -1., 1.));
+      addnSP(h, new TH1F("trecerr_fromtracks", "vertex time error from tracks", 200, 0., 0.1));
+      addnSP(h, new TH1F("trecsimpull_fromtracks", "tpull from tracks", 200, -10., 10.));
+      addnSP(h,
+	     new TH1F("trecsim_withtracks", "vertex time residual from vertex", 200, -1., 1.));  //reference for fromtracks
+      addnSP(h, new TH1F("trecerr_withtracks", "vertex time error from vertex", 200, 0., 0.1));
+      addnSP(h, new TH1F("trecsimpull_withtracks", "tpull from vertex", 200, -10., 10.));
+      
       addnSP(h, new TH1F("trecsim","trec - tsim", 100, -0.1, 0.1));
       addnSP(h, new TH1F("trecsimpull","(trec - tsim)/error", 100, -10, 10));
+      addnSP(h, new TH1F("trecerr","trec uncertainty", 100, 0.0, 0.1));
+      addnSP(h, new TProfile("trecerrvsntrk","trec uncertainty vs # of timing tracks", 200, 0., 200, 0.0, 0.1));
     }
     dir->cd();
   }// vtypes
@@ -2322,8 +2324,8 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
 
   add(hTrk, new TH1F("ttrk_rec_all_wide", "reconstructed t for primary tracks", 200, -10., 10.));
   add(hTrk, new TH1F("ttrk_rec_all", "reconstructed t for primary tracks", 200, -1., 1.));
-  add(hTrk, new TH1F("terrtrk_rec_all", "reconstructed t error for all", 200, 0., 1.));
-  add(hTrk, new TH1F("terrtrk_rec_sel", "reconstructed t error for all selected tracks", 200, 0., 1.));
+  add(hTrk, new TH1F("terrtrk_rec_all", "reconstructed t error for all", 200, 0., 0.2));
+  add(hTrk, new TH1F("terrtrk_rec_sel", "reconstructed t error for all selected tracks", 200, 0., 0.2));
 
   add(hTrk, new TH1F("ttrk_rec_sel_wide", "reconstructed t for selected tracks", 200, -10., 10.));
   add(hTrk, new TH1F("ttrk_rec_sel", "reconstructed t for selected tracks", 200, -1., 1.));
@@ -4004,12 +4006,13 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   unsigned int nseltrk = 0;
   for (trackit_t tv = v->tracks_begin(); tv != v->tracks_end(); tv++) {
     nseltrk++;
-    auto t = tracks.from_ref(*tv);
-    if (t.has_timing) {
-      ntiming++;
+    if(f4D_){
+      auto t = tracks.from_ref(*tv);
+      if (t.has_timing) {
+	ntiming++;
+      }
     }
   }
-  Fill(h, vtype + "/ntimingvtx", float(ntiming), simevt.is_signal());
   Fill(h, vtype + "/nseltrkvtx", float(nseltrk), simevt.is_signal());
   if (simevt.is_signal()){ // not using the automatic version because "ptmax2" (no suffix) is filled in fillVertexHistos
     Fill(h, vtype + "/ptmax2Signal", vertex_ptmax2(*v));
@@ -4034,23 +4037,27 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 
   if (f4D_)
     {
+      Fill(h, vtype + "/ntimingvtx", float(ntiming), simevt.is_signal());
+      
       double t_fromtracks, tError_fromtracks;
       bool timing_from_tracks = vertex_time_from_tracks(*v, tracks, t_fromtracks, tError_fromtracks);
 
+      double tsim = simevt.t;
+      Fill(h, vtype + "/trecsim", v->t() - tsim, simevt.is_signal());
+      Fill(h, vtype + "/trecerr", v->tError(), simevt.is_signal());
+      Fill(h, vtype + "/trecsimpull", (v->t() - tsim) / v->tError(), simevt.is_signal());
+      Fill(h, vtype + "/trecerrvsntrk", float(ntiming), v->tError(), simevt.is_signal());
+      
       if (timing_from_tracks)
 	{
-	  double tsim = simevt.t;
-	  Fill(h, vtype + "/trecsim", v->t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull", (v->t() - tsim) / v->tError(), simevt.is_signal());
-
 	  // timing from tracks
 	  Fill(h, vtype + "/trecsim_fromtracks" , t_fromtracks - simevt.t, simevt.is_signal());
-	  Fill(h, vtype + "/terrvtx_fromtracks", tError_fromtracks, simevt.is_signal());
+	  Fill(h, vtype + "/trecerr_fromtracks", tError_fromtracks, simevt.is_signal());
 	  Fill(h, vtype + "/trecsimpull_fromtracks", (t_fromtracks - simevt.t) / tError_fromtracks, simevt.is_signal());
 
 	  // also fill histos with the default values for the same list of vertices for comparison
 	  Fill(h, vtype + "/trecsim_withtracks", v->t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/terrvtx_withtracks", v->tError(), simevt.is_signal());
+	  Fill(h, vtype + "/trecerr_withtracks", v->tError(), simevt.is_signal());
 	  Fill(h, vtype + "/trecsimpull_withtracks", (v->t() - tsim) / v->tError(), simevt.is_signal());
 	}
     }
