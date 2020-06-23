@@ -858,7 +858,7 @@ private:
   void get_particle_data_table(const edm::EventSetup&);
   bool get_beamspot_data(const edm::Event&);
   bool get_reco_and_transient_tracks(const edm::EventSetup&, const edm::Event&, Tracks&);
-  reco::TransientTrack* get_transient_track(const reco::TrackBaseRef&);
+  reco::TransientTrack* get_transient_track_obsolete(const reco::TrackBaseRef&);
 
   double muvtx(double z);
 
@@ -898,10 +898,6 @@ private:
                                 const reco::TransientTrack* tt,
                                 const reco::Vertex* v = NULL);
   void fillRecoTrackHistos(std::map<std::string, TH1*>& h, const std::string& ttype, const reco::Track& t);
-  void fillTrackHistos(std::map<std::string, TH1*>& h,
-                       const std::string& ttype,
-                       const reco::TrackBaseRef& t,
-                       const reco::Vertex* v = NULL);
   void fillTrackClusterHistos(std::map<std::string, TH1*>& h,
                               const std::string& ttype,
                               const reco::Track& t,
@@ -1155,7 +1151,7 @@ private:
   std::map<unsigned int, unsigned int> trkkey2simevt_;
   std::map<unsigned int, unsigned int> trkkey2recvtx_;
 
-  std::map<unsigned int, reco::TransientTrack*> trkkey2ttrk_;
+  std::map<unsigned int, reco::TransientTrack*> trkkey2ttrk_obsolete;
 
   reco::BeamSpot vertexBeamSpot_;
   edm::Handle<reco::BeamSpot> recoBeamSpotHandle_;
