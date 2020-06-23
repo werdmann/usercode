@@ -3794,45 +3794,52 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
         double w = v.trackWeight(*tk) / (trk.dt * trk.dt);
         wsum += w;
         tsum += w * trk.t;
-        w2sum += w * w * trk.dt * trk.dt;
+        //w2sum += w * w * trk.dt * trk.dt;
       }
     }
   }
 
   if (wsum > 0) {
     double t0 = tsum / wsum;
+    int nit = 0;
     // robustify
-    tsum = 0;
-    wsum = 0;
-    w2sum = 0;
-    for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
+    while ( (nit++) < 10)
       {
-	if (v.trackWeight(*tk) > 0.5)
+	tsum = 0;
+	wsum = 0;
+	w2sum = 0;
+	for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
 	  {
-	    auto trk = tracks.from_ref(*tk);
-	    if (trk.has_timing)
+	    if (v.trackWeight(*tk) > 0.5)
 	      {
-		double tpull = (trk.t -t0) / trk.dt;
-		if (fabs(tpull) < 5)
+		auto trk = tracks.from_ref(*tk);
+		if (trk.has_timing)
 		  {
-		    double wt = 1./(1.+ exp(0.5 * tpull * tpull - 0.5 * 9.));
-		    double w = wt * v.trackWeight(*tk) / (trk.dt * trk.dt);
-		    wsum += w;
-		    tsum += w * trk.t;
-		    w2sum += w * w * trk.dt * trk.dt;
+		    double tpull = (trk.t -t0) / trk.dt;
+		    if (fabs(tpull) < 5)
+		      {
+			double wt = 1./(1.+ exp(0.5 * tpull * tpull - 0.5 * 4.));
+			double w = wt * v.trackWeight(*tk) / (trk.dt * trk.dt);
+			wsum += w;
+			tsum += w * trk.t;
+			w2sum += w * w * trk.dt * trk.dt;
+		      }
 		  }
 	      }
 	  }
-      }
-    
-    if (wsum > 0)
-      {
-	t = tsum / wsum;
-	tError = sqrt(w2sum) / wsum;
-	return true;
+
+    	if (wsum > 0)
+	  {
+	    t = tsum / wsum;
+	    if (fabs(t - t0) < 1e-3)
+	      {
+		tError = sqrt(w2sum) / wsum;
+		return true;
+	      }
+	  }
+	t0 = t;
       }
   }
-
   t = 0;
   tError = 1.e10;
   return false;
