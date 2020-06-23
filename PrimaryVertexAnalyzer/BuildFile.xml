@@ -1,9 +1,6 @@
-<use name="DataFormats/TrackReco"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
 <use name="FWCore/PluginManager"/>
-<use name="SimGeneral/HepPDTRecord"/>
-<use name="hepmc"/>
 <use   name="DataFormats/BeamSpot"/>
 <use   name="DataFormats/Candidate"/>
 <use   name="DataFormats/Luminosity"/>
