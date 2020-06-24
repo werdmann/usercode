@@ -80,6 +80,7 @@ parameters={  # can be overwritten by arguments of the same name
   "maxD0Error":cms.double(1.0),
 # vertex selection
   "minNdof": cms.double( 0.0 ),
+  "trackTimeQualityThreshold" : cms.untracked.double(0.5)
 }
 
 # temporary fix, should not be needed
@@ -337,6 +338,8 @@ if DO_VTX_RECO:
     #
     for p in (process.unsortedOfflinePrimaryVertices4DnoPID, process.unsortedOfflinePrimaryVertices4D):
         p.verbose = parameters["verboseProducer"]
+        p.TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"]#cms.untracked.double(0.5);
+        p.TrackTimeQualityMapLabel = cms.untracked.InputTag("mtdTrackQualityMVA:mtdQualMVA")
         #p.new = parameters["newClusterizer"]
         p.TkClusParameters.TkDAClusParameters.verbose =  parameters["verboseClusterizer2D"]
         p.TkClusParameters.TkDAClusParameters.zdumpcenter = parameters["zdumpcenter"]
@@ -349,12 +352,6 @@ if DO_VTX_RECO:
         for par_name in ("Tmin", "Tpurge", "vertexSizeTime"):
             if parameters[par_name] > 0:
                 setattr(p.TkClusParameters.TkDAClusParameters, par_name, parameters[par_name])
-        #if parameters["Tmin"] > 0:
-        #    p.TkClusParameters.TkDAClusParameters.Tmin = parameters["Tmin"]
-        #if parameters["Tpurge"] > 0:
-        #    p.TkClusParameters.TkDAClusParameters.Tpurge = parameters["Tpurge"]
-        #if parameters["vertexSizeTime"] > 0:
-        #    p.TkClusParameters.TkDAClusParameters.vertexSizeTime = parameters["vertexSizeTime"]
 
         p.TkFilterParameters = tkFilterParameters.clone()
     
@@ -383,6 +380,8 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     trackAssociatorMap = cms.untracked.InputTag("trackingParticleRecoTrackAsssociation"),
     TrackTimesLabel = cms.untracked.InputTag("tofPID4DnoPID:t0safe"),  # as opposed to "tofPID:t0safe"
     TrackTimeResosLabel = cms.untracked.InputTag("tofPID4DnoPID:sigmat0safe"),
+    TrackTimeQualityMapLabel = cms.untracked.InputTag("mtdTrackQualityMVA:mtdQualMVA"),
+    TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"],
     vertexAssociator = cms.untracked.InputTag("VertexAssociatorByPositionAndTracks"),
     useVertexFilter = cms.untracked.bool(False),
     compareCollections = cms.untracked.int32(0),

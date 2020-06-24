@@ -465,11 +465,13 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       has_timing = false;
       t = 0;
       dt = 1e10;
+      timeQuality = -1.;
       if (f4D) {
         t = tt->timeExt();
         dt = tt->dtErrorExt();
         if ((dt > 0) && (dt < 0.3)) {
           has_timing = true;
+	  timeQuality = 1.; // temporary, overridden externally for now
         }
       }
 
@@ -478,7 +480,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
       // filled later by getSimEvents
       matched = false;
-      simEvt = NULL;
+      simEvt = nullptr;
       zsim = 0;
       tsim = 0;
       is_primary = false;
@@ -516,6 +518,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     bool has_timing;
     double t;
     double dt;
+    double timeQuality;
     double pt, eta, phi, ip, dip, theta;
 
     // filled later if available
@@ -868,7 +871,7 @@ private:
   bool isCharged(const HepMC::GenParticle* p);
   void fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                 const std::string& vtype,
-                                const reco::Vertex* v = NULL,
+                                const reco::Vertex* v = nullptr,
                                 const double deltaz = 0,
                                 const bool verbose = false);
   void fillVertexHistos(std::map<std::string, TH1*>& h,
@@ -1190,6 +1193,8 @@ private:
   // see RecoVertex/Configuration/python/RecoVertex_phase2_timing_cff.py
   edm::EDGetTokenT<edm::ValueMap<float> > trkTimesToken_;
   edm::EDGetTokenT<edm::ValueMap<float> > trkTimeResosToken_;
+  edm::EDGetTokenT<edm::ValueMap<float> > trkTimeQualityToken_;
+  double trkTimeQualityThreshold_;
   edm::EDGetTokenT<reco::BeamSpot> recoBeamSpotToken_;
   edm::EDGetTokenT<edm::View<reco::Track> > edmView_recoTrack_Token_;
   edm::EDGetTokenT<edm::SimVertexContainer> edmSimVertexContainerToken_;
