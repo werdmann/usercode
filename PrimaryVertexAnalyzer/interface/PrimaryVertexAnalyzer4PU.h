@@ -480,7 +480,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
       // filled later by getSimEvents
       matched = false;
-      simEvt = nullptr;
+      simEvt = NULL;
       zsim = 0;
       tsim = 0;
       is_primary = false;
@@ -871,7 +871,7 @@ private:
   bool isCharged(const HepMC::GenParticle* p);
   void fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                 const std::string& vtype,
-                                const reco::Vertex* v = nullptr,
+                                const reco::Vertex* v = NULL,
                                 const double deltaz = 0,
                                 const bool verbose = false);
   void fillVertexHistos(std::map<std::string, TH1*>& h,

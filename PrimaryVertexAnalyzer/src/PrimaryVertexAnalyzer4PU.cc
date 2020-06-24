@@ -2329,7 +2329,8 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
   add(hTrk, new TH1F("ttrk_rec_primselmatched", "reconstructed t for primary tracks", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_primselmatched", "reconstructed t -simulated t for selected matched primary tracks", 200, -1., 1.)); //???
 
-  double tqualmin=-2.0, tqualmax=2.0;
+  float tqualmin=-2.0;
+  float tqualmax=2.0;
   add(hTrk, new TH1F("ttrk_rec_all_wide", "reconstructed t for primary tracks", 200, -10., 10.));
   add(hTrk, new TH1F("ttrk_rec_all", "reconstructed t for primary tracks", 200, -1., 1.));
   add(hTrk, new TH1F("terrtrk_rec_all", "reconstructed t error for all", 200, 0., 0.2));
@@ -2344,7 +2345,7 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
   add(hTrk, new TH1F("terrtrk_rec_selmatched", "reconstructed t error for matched selected tracks", 200, 0., 0.1));
   add(hTrk, new TH1F("terrtrk_rec_selmatched_barrel", "reconstructed t error for matched selected tracks (barrel)", 200, 0., 0.1));
   add(hTrk, new TH1F("terrtrk_rec_selmatched_endcap", "reconstructed t error for matched selected tracks (endcap)", 200, 0., 0.1));
-  add(hTrk, new TH1F("tqualtrk_rec_selmatched", "time quality for matched selected tracks", 200, -2., 2.));
+  add(hTrk, new TH1F("tqualtrk_rec_selmatched", "time quality for matched selected tracks", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("tqualtrk_rec_selmatched_barrel", "time quality for matched selected tracks", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("tqualtrk_rec_selmatched_endcap", "time quality for matched selected tracks", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("tqualtrk_rec_selmatched_barrel_hipt", "time quality for matched selected tracks", 200, tqualmin, tqualmax));
@@ -2652,9 +2653,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
     edm::Handle<edm::ValueMap<float>> trackTimeResosH;
     iEvent.getByToken(trkTimesToken_, trackTimesH);
     iEvent.getByToken(trkTimeResosToken_, trackTimeResosH);
-    if(trkTimeQualityThreshold_ > 0){
-      iEvent.getByToken(trkTimeQualityToken_, trackTimeQualityH);
-    }
+    iEvent.getByToken(trkTimeQualityToken_, trackTimeQualityH);
 
     t_tks_ = (*theB_).build(
         tracks.trackCollectionH, vertexBeamSpot_, *(trackTimesH.product()), *(trackTimeResosH.product()));
@@ -2675,7 +2674,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
     }
 
     auto t = RecoTrack(i, &recTrks->at(i), tt, key1, f4D_);
-    if(f4D_ && (trkTimeQualityThreshold_ > 0) ){
+    if(f4D_){
       t.timeQuality = (*trackTimeQualityH)[tt->trackBaseRef()];
     }
     t.selected = theTrackFilter(*tt);
@@ -4148,7 +4147,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h,
       Fill(h, ttype + "/t0trk", tk.t);
       Fill(h, ttype + "/t0errtrk", tk.dt);
       Fill(h, ttype + "/t0qualtrk", tk.timeQuality);
-      if (! (v==nullptr) && (v->isValid()) && (v->ndof() > 10.) ){
+      if (! (v==NULL) && (v->isValid()) && (v->ndof() > 10.) ){
 	double deltat = tk.t - v->t();
 	Fill(h, ttype + "/trestrk", deltat);
 	Fill(h, ttype + "/tpulltrk", deltat / sqrt(pow(tk.dt,2) + pow(v->tError(), 2)));
@@ -4156,7 +4155,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h,
     }
 
   
-  if ((!(v == nullptr)) && (v->isValid()) && (v->ndof() > 10.)) {
+  if ((!(v == NULL)) && (v->isValid()) && (v->ndof() > 10.)) {
     double zvtx = v->position().z();
     double dz2 = tk.dz * tk.dz + (pow(wx_ * cos(tk.phi), 2) + pow(wy_ * sin(tk.phi), 2)) / pow(tan(tk.theta), 2); // really?
     Fill(h, ttype + "/zrestrk", tk.z - zvtx);
@@ -4180,7 +4179,7 @@ void PrimaryVertexAnalyzer4PU::fillTransientTrackHistos(std::map<std::string, TH
                                                         const TransientTrack* tt,
                                                         const reco::Vertex* v) {
 
-  if ((!(v == nullptr)) && (v->isValid()) && (v->ndof() > 10.)) {
+  if ((!(v == NULL)) && (v->isValid()) && (v->ndof() > 10.)) {
     double z = (tt->stateAtBeamLine().trackStateAtPCA()).position().z();
     double zvtx = v->position().z();
     double tantheta = tan((tt->stateAtBeamLine().trackStateAtPCA()).momentum().theta());
@@ -4768,7 +4767,7 @@ void PrimaryVertexAnalyzer4PU::printPVTrksZT(edm::Handle<edm::View<Track>> track
   for (unsigned int i = 0; i < selTrks.size(); i++) {
     selRecTrks.push_back(selTrks[i].first.track());
   }
-  int* rectosim = nullptr;
+  int* rectosim = NULL;
   if (MC_)
     rectosim = supfv(tsim, selRecTrks);
 
@@ -5487,7 +5486,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
       }
     } else {
       tk.matched = false;
-      tk.simEvt = nullptr;
+      tk.simEvt = NULL;
       tk.zsim = 0;
       tk.tsim = 0;
       tk.is_primary = false;
@@ -5650,7 +5649,7 @@ std::vector<PrimaryVertexAnalyzer4PU::simPrimaryVertex> PrimaryVertexAnalyzer4PU
       const double s = 1e9;
       simPrimaryVertex sv(pos.x() * mm, pos.y() * mm, pos.z() * mm, pos.t() * s);
       sv.type = 1;
-      simPrimaryVertex* vp = nullptr;  // will become non-nullptr if a vertex is found and then point to it
+      simPrimaryVertex* vp = NULL;  // will become non-NULL if a vertex is found and then point to it
       for (std::vector<simPrimaryVertex>::iterator v0 = simpv.begin(); v0 != simpv.end(); v0++) {
         if ((fabs(sv.x - v0->x) < 1e-5) && (fabs(sv.y - v0->y) < 1e-5) && (fabs(sv.z - v0->z) < 1e-5)) {
           vp = &(*v0);
@@ -5770,7 +5769,7 @@ std::vector<PrimaryVertexAnalyzer4PU::simPrimaryVertex> PrimaryVertexAnalyzer4PU
       sv.eventId = (**iTrack).eventId();  // an iterator of Refs, dereference twice
     }
 
-    simPrimaryVertex* vp = nullptr;  // will become non-nullptr if a vertex is found and then point to it
+    simPrimaryVertex* vp = NULL;  // will become non-NULL if a vertex is found and then point to it
     for (auto v0 = simpv.begin(); v0 != simpv.end(); v0++) {
       if ((sv.eventId == v0->eventId) ||
           ((fabs(sv.x - v0->x) < 1e-5) && (fabs(sv.y - v0->y) < 1e-5) && (fabs(sv.z - v0->z) < 1e-5))) {
@@ -5882,7 +5881,7 @@ std::vector<PrimaryVertexAnalyzer4PU::simPrimaryVertex> PrimaryVertexAnalyzer4PU
       sv.eventId = (**iTrack).eventId();  // an iterator of Refs, dereference twice
     }
 
-    simPrimaryVertex* vp = nullptr;  // will become non-nullptr if a vertex is found and then point to it
+    simPrimaryVertex* vp = NULL;  // will become non-NULL if a vertex is found and then point to it
     for (auto v0 = simpv.begin(); v0 != simpv.end(); v0++) {
       if ((sv.eventId == v0->eventId) ||
           ((fabs(sv.x - v0->x) < 1e-5) && (fabs(sv.y - v0->y) < 1e-5) && (fabs(sv.z - v0->z) < 1e-5))) {
@@ -6062,7 +6061,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
       analyzeVertexRecoCPUTime(histograms_[*vCollection], recVtxs_[*vCollection], *vCollection);
       analyzeVertexCollectionRecoNoTracks(histograms_[*vCollection], recVtxs_[*vCollection], *vCollection);
     } else {
-      recVtxs_[*vCollection] = nullptr;
+      recVtxs_[*vCollection] = NULL;
       cout << "collection " << *vCollection << " not found " << endl;
     }
   }
@@ -6096,7 +6095,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   for (std::vector<std::string>::const_iterator vCollection = vertexCollectionLabels_.begin();
        vCollection != vertexCollectionLabels_.end();
        vCollection++) {
-    if (recVtxs_[*vCollection] == nullptr)
+    if (recVtxs_[*vCollection] == NULL)
       continue;
 
     // set up the track-> vertex map
@@ -6163,7 +6162,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
     bool trksdumped = false;
     for (auto vCollection = vertexCollectionLabels_.begin(); vCollection != vertexCollectionLabels_.end();
          vCollection++) {
-      if (recVtxs_[*vCollection] != nullptr) {
+      if (recVtxs_[*vCollection] != NULL) {
 	cout << " dumping collection " << *vCollection << endl;
         printRecVtxs(recVtxs_[*vCollection]);
 	printMatchingSummary(recVtxs_[*vCollection], simEvt, recvmatch_[*vCollection], *vCollection);
@@ -6460,7 +6459,7 @@ simulated vertices are shown if they are available
       for (unsigned int irow = 0; irow < row.size(); irow++) {
         cout << setw(2) << irow << ")";
         cout << setw(8) << setprecision(4) << fixed << row[irow].first;
-        if (row[irow].second == nullptr)
+        if (row[irow].second == NULL)
           continue;
         for (unsigned int i = 0; i < ncoll + 1; i++) {
           cout << setw(6) << row[irow].second[i];
@@ -6482,7 +6481,7 @@ simulated vertices are shown if they are available
         for (unsigned int irow = 0; irow < row.size(); irow++) {
           cout << setw(2) << irow << ")";
           cout << setw(8) << setprecision(4) << fixed << row[irow].first;
-          if (!(row[irow].second == nullptr)) {
+          if (!(row[irow].second == NULL)) {
             for (unsigned int i = 0; i < ncoll + 1; i++) {
               cout << setw(6) << row[irow].second[i];
             }
@@ -6495,7 +6494,7 @@ simulated vertices are shown if they are available
       double dzmin = 0.1;
       join = -1;
       for (unsigned int irow = 0; irow < row.size() - 1; irow++) {
-        if ((row[irow].second == nullptr) || (row[irow + 1].second == nullptr))
+        if ((row[irow].second == NULL) || (row[irow + 1].second == NULL))
           continue;
         if ((row[irow + 1].first - row[irow].first) < dzmin) {
           bool joinable = true;
@@ -6513,7 +6512,7 @@ simulated vertices are shown if they are available
       if (join >= 0) {
         if (debug)
           cout << "joining " << join << endl;
-        if ((row[join].second == nullptr) || (row[join + 1].second == nullptr)) {
+        if ((row[join].second == NULL) || (row[join + 1].second == NULL)) {
           cout << " bad join=" << join << endl;
         }
         if (join >= int(row.size())) {
@@ -6553,7 +6552,7 @@ simulated vertices are shown if they are available
         if (debug)
           cout << "deleting row " << join + 1 << "  row size= " << row.size() << "  ncoll= " << ncoll << endl;
         delete[] row[join + 1].second;
-        row[join + 1].second = nullptr;
+        row[join + 1].second = NULL;
         row.erase(row.begin() + (join + 1));
 
         if (debug) {
@@ -6561,7 +6560,7 @@ simulated vertices are shown if they are available
           for (unsigned int irow = 0; irow < row.size(); irow++) {
             cout << setw(2) << irow << ")";
             cout << setw(8) << setprecision(4) << fixed << row[irow].first;
-            if (!(row[irow].second == nullptr)) {
+            if (!(row[irow].second == NULL)) {
               for (unsigned int i = 0; i < ncoll + 1; i++) {
                 cout << setw(6) << row[irow].second[i];
               }
@@ -6578,7 +6577,7 @@ simulated vertices are shown if they are available
       for (unsigned int irow = 0; irow < row.size(); irow++) {
         cout << setw(2) << irow << ")";
         cout << setw(8) << setprecision(4) << fixed << row[irow].first;
-        if (!(row[irow].second == nullptr)) {
+        if (!(row[irow].second == NULL)) {
           for (unsigned int i = 0; i < ncoll + 1; i++) {
             cout << setw(6) << row[irow].second[i];
           }
@@ -6600,7 +6599,7 @@ simulated vertices are shown if they are available
       }
       for (unsigned int jcol = 0; jcol < ncoll; jcol++) {
         reco::VertexCollection* recVtxs = recVtxs_[vertexCollectionLabels_[jcol]];
-        if (!(recVtxs == nullptr)) {
+        if (!(recVtxs == NULL)) {
           int i = NOT_MATCHED;
           for (unsigned int j = 0; j < recVtxs->size(); j++) {
             if (recvmatch_[vertexCollectionLabels_[jcol]][j].sim == idx) {
@@ -6626,7 +6625,7 @@ simulated vertices are shown if they are available
     for (unsigned int irow = 0; irow < row.size(); irow++) {
       cout << setw(2) << irow << ")";
       cout << setw(8) << setprecision(4) << fixed << row[irow].first;
-      if (!(row[irow].second == nullptr)) {
+      if (!(row[irow].second == NULL)) {
         for (unsigned int i = 0; i < ncoll + 1; i++) {
           cout << setw(6) << row[irow].second[i];
         }
@@ -6639,7 +6638,7 @@ simulated vertices are shown if they are available
 
   // readable dump
   for (unsigned int irow = 0; irow < row.size(); irow++) {
-    if (row[irow].second == nullptr)
+    if (row[irow].second == NULL)
       continue;
 
     double z = row[irow].first;
@@ -6684,7 +6683,7 @@ simulated vertices are shown if they are available
       unsigned int idx = v[jcol];
       if (idx != NOT_MATCHED) {
         reco::VertexCollection* recVtxs = recVtxs_[vertexCollectionLabels_[jcol]];
-        if (!(recVtxs == nullptr)) {
+        if (!(recVtxs == NULL)) {
           cout << fixed << setw(10) << setprecision(4) << recVtxs->at(idx).z() << " (" << setw(5) << setprecision(1)
                << recVtxs->at(idx).ndof() << ")";
         } else {
@@ -6707,9 +6706,9 @@ simulated vertices are shown if they are available
   }
 
   for (unsigned int irow = 0; irow < row.size(); irow++) {
-    if (!(row[irow].second == nullptr)) {
+    if (!(row[irow].second == NULL)) {
       delete[] row[irow].second;
-      row[irow].second = nullptr;
+      row[irow].second = NULL;
     }
   }
 
@@ -9429,7 +9428,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimPv(std::map<std::string
   bool debug = false;
 
   // find the reco vertex matching the signal via truth matched tracks (don't have those for pu)
-  int* rectosim = nullptr;
+  int* rectosim = NULL;
   if (MC_)
     rectosim = supf(tsim, *tracks.trackCollectionH.product());
   double zsimsignal = simpv[0].z;
@@ -9699,18 +9698,18 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimPv(std::map<std::string
     Fill(h, "nsimtrkaccsec", static_cast<double>(vsim->nTrkSec), is_signal);    // nsimtrkSignal or nsimtrkPU
 
     // look for a matching reconstructed vertex
-    vsim->recVtx = nullptr;
+    vsim->recVtx = NULL;
 
     // find the nearest recvertex  (multiple sims may be mapped to the same rec)
     for (auto vrec = recVtxs->begin(); vrec != recVtxs->end(); ++vrec) {
       if (!(vrec->isFake())) {
-        if ((vsim->recVtx == nullptr) || ((fabs(vsim->recVtx->position().z() - vsim->z) > fabs(vrec->z() - vsim->z)))) {
+        if ((vsim->recVtx == NULL) || ((fabs(vsim->recVtx->position().z() - vsim->z) > fabs(vrec->z() - vsim->z)))) {
           vsim->recVtx = &(*vrec);
         }
       }
     }
 
-    if (vsim->recVtx == nullptr) {
+    if (vsim->recVtx == NULL) {
       cout << "PrimaryVertexAnalyzer4PU:analyzerVertexCollectionSimPV : no recvtx ? " << endl;
       return;
     }
@@ -9834,7 +9833,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimPv(std::map<std::string
 
   // look for rec vertices with no matching sim vertex
   for (reco::VertexCollection::const_iterator vrec = recVtxs->begin(); vrec != recVtxs->end(); ++vrec) {
-    simPrimaryVertex* match = nullptr;
+    simPrimaryVertex* match = NULL;
     double zmax = zmatch_;
     if ((3 * vrec->zError()) > zmatch_)
       zmax = 3 * vrec->zError();
@@ -9842,12 +9841,12 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimPv(std::map<std::string
     if (!(vrec->isFake())) {
       for (std::vector<simPrimaryVertex>::iterator vsim = simpv.begin(); vsim != simpv.end(); vsim++) {
         if ((vsim->recVtx == &(*vrec)) &&
-            ((match == nullptr) || (fabs(vrec->position().z() - vsim->z) < fabs(vrec->position().z() - match->z)))) {
+            ((match == NULL) || (fabs(vrec->position().z() - vsim->z) < fabs(vrec->position().z() - match->z)))) {
           match = &(*vsim);
         }
       }
 
-      if ((match == nullptr) || (fabs(vrec->position().z() - match->z) > zmax)) {
+      if ((match == NULL) || (fabs(vrec->position().z() - match->z) > zmax)) {
         Fill(h, "fakeVtxZ", vrec->z());
         if (vrec->ndof() >= 0.5)
           Fill(h, "fakeVtxZNdofgt05", vrec->z());
@@ -9906,7 +9905,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimPv(std::map<std::string
           continue;
         double deltazsim = vsim2->z - vsim1->z;
         Fill(h, "zdiffsimall", deltazsim);
-        if ((vsim1->recVtx == nullptr) || (vsim2->recVtx == nullptr))
+        if ((vsim1->recVtx == NULL) || (vsim2->recVtx == NULL))
           continue;
         double deltazrec = vsim2->recVtx->position().z() - vsim1->recVtx->position().z();
         if (vsim2->recVtx == vsim1->recVtx) {
