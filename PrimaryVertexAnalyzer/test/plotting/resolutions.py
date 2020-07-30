@@ -1,13 +1,16 @@
-from rutil import Frame, canvas, TCachingFile, keep
+from rutil import Frame, canvas, TCachingFile, keep, parseOpt
 from ROOT import TMath, TF1
 import sys
 
+
+
+args = parseOpt(pufile="v22/pvt_RUN4PU200TTBAR__A.root", nopufile="v22/pvt_RUN4NOTTBAR__A.root", name="")
+
 #tcf = TCachingFile("v18/pvt_RUN4PU200TTBAR_new_A.root")
-tcfpu = TCachingFile("v20/pvt_RUN4PU200TTBAR_new_A.root")
-tcfnopu = TCachingFile("v20/pvt_RUN4NOPUTTBAR_new_A.root")
+tcfpu = TCachingFile(args.pufile)
+tcfnopu = TCachingFile(args.nopufile)
 scale = 1.0*tcfpu.Get("offlinePrimaryVertices/sigmaZ").GetEntries()/tcfnopu.Get("offlinePrimaryVertices/sigmaZ").GetEntries()
 tcfnopu.norm = scale
-
 
 
 def get(tcf, hid, style=1,rebin=2, scale=None):

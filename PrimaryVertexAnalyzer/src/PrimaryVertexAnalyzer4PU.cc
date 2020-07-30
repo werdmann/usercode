@@ -321,12 +321,20 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
   addn(h, new TProfile("tfitvsSimPU", "fitting time vs #simvtx", 300, 0., 300., 0., 1.e8));
   dir->cd();
 
+  /* pseudo physics variables, ptvis */
+  // 0   |dz| < 0.1 
+  // 1   |dz| < 0.2
+  // 2   |dz| < 3 sigma
+  // 3   nearest vertex
+  // 4   weighted
+
   dir->mkdir("ptvis")->cd();
   for(unsigned int i = 0; i < 5; i++){ 
     addn(h, new TH1F(Form("ptvis%d", i), Form("ptvis%d",i), 100, 0., 2.));
     addn(h, new TProfile(Form("ptvis%dvsz", i), Form("ptvis%d vs z", i), 30, -15., 15., 0., 100.));
     addn(h, new TProfile(Form("ptvis%dvspu", i), Form("ptvis%d vs pu", i), 30, 0., 300., 0., 100.));
     addn(h, new TProfile(Form("ptvis%dvsdensity", i), Form("ptvis%d vs density", i), 30, 0., 30., 0., 100.));
+    // note that the vs density plot is a bit tricky to interprete, because at low density it contains more of the high z region
 
     addn(h, new TH1F(Form("ptmiss_sim%d", i), Form("sim ptmiss%d",i), 100, 0., 200.));
     addn(h, new TH1F(Form("ptmiss%d", i), Form("ptmiss%d",i), 100, 0., 200.));
@@ -483,6 +491,8 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
   add(h,
       new TH1F(
           "zdiffrec4PUfake", "z-distance between reconstructed PU and fake ndof>4 vertices", nbinzdiffrec, 0., 2.));
+  add(h, new TH1F("zdiffrec4Signalfake", "z-distance between reconstructed Signal and fake ndof>4 vertices", nbinzdiffrec, 0., 2.));
+  add(h, new TH1F("zdiffrec4Signalreal", "z-distance between reconstructed Signal and real ndof>4 vertices", nbinzdiffrec, 0., 2.));
 
   add(h, new TH1F("zdiffmin4fakereal", "z-distance between fake and nearest real rec vertex", nbinzdiffrec, 0, 2.));
   add(h, new TH1F("zdiffmin4realreal", "z-distance between real and nearest real rec vertex", nbinzdiffrec, 0, 2.));
@@ -513,11 +523,13 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
   addSP(h, new TProfile("vtxtrkpurityvspu", "track purity in vertex vs PU", npubin2, 0., npumax, 0., 2.));
   addSP(h, new TProfile("vtxtrkeffvsPU", "track efficiency in vertex vs PU", npubin2, 0., npumax, 0., 2.));
 
-  add(h, new TProfile("effvsnrectp", "efficiency vs # truth matched rec tracks", 50, 0., 50., 0, 1.));
-  add(h, new TProfile("effvsngentp", "efficiency vs # visible tracking particles", 50, 0., 50., 0, 1.));
-  add(h, new TProfile("effvssumpt", "efficiency vs # pt sum of charged particles", 50, 0., 10., 0, 1.));
-  add(h, new TProfile("effsigvsnrectp", "signal efficiency vs # truth matched rec tracks", 50, 0., 100., 0, 1.));
-  add(h, new TProfile("effsigvsngentp", "signal efficiency vs # visible tracking particles", 50, 0., 100., 0, 1.));
+  addSP(h, new TProfile("effvsnrectp", "efficiency vs # truth matched rec tracks", 50, 0., 50., 0, 1.));
+  addSP(h, new TProfile("effvsngentp", "efficiency vs # visible tracking particles", 50, 0., 50., 0, 1.));
+  addSP(h, new TProfile("effvssumpt", "efficiency vs # pt sum of charged particles", 50, 0., 10., 0, 1.));
+  addSP(h, new TProfile("effvssumpt2", "efficiency vs # pt2 sum of charged particles", 50, 0., 1000., 0, 1.));
+  // obsolete:
+  //add(h, new TProfile("effsigvsnrectp", "signal efficiency vs # truth matched rec tracks", 50, 0., 100., 0, 1.));
+  //add(h, new TProfile("effsigvsngentp", "signal efficiency vs # visible tracking particles", 50, 0., 100., 0, 1.));
 
   add(h, new TH1F("vtxndf_tagged", "degrees of freedom (tagged)", 5000, 0., 1000.));
   add(h, new TH1F("vtxndfc", "expected lower ndof of two", 5000, 0., 1000.));
@@ -1572,6 +1584,8 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
 			   "matchedvtxsel",
 			   "splitvtxsel",
 			   "otherfakevtxsel",
+			   "matchedsignalvtxsel",
+			   "matchedpuvtxsel",
                            "hipu",
                            "tail",
                            "tailzgt1",
@@ -1608,6 +1622,8 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
     addn(h, new TH2F("sphericityvsntrk", "sphericity vs nt", 100, 0., 50., 200, 0., 1.));
     addn(h, new TH2F("vtxndfvsntrk", "ndof vs #tracks", 50, 0., 50, 100, 0., 100.));
     addn(h, new TH1F("avweight", "ndof / #tracks", 50, 0., 1.));
+    addn(h, new TH2F("avweightvsndof", "ndof / #tracks", 50, 0., 1., 100, 0., 100.));
+    addn(h, new TH1F("avweightX", "ndof / #tracks", 50, 0., 1.));
     addn(h, new TH1F("errx", "error x", 100, 0., 0.02)); // 
     addn(h, new TH1F("erry", "error y", 100, 0., 0.02));
     addn(h, new TH1F("errz", "error z", 100, 0., 0.05));
@@ -1637,6 +1653,8 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
 
     if (f4D_){
       addnSP(h, new TH1F("ntimingvtx", "#timing tracks", 200, 0., 200.));
+      addnSP(h, new TH1F("ntimingqual05vtx", "#timing tracks above quality threshold 0.5", 200, 0., 200.));
+      addnSP(h, new TH1F("ntimingqual08vtx", "#timing tracks above quality threshold 0.8", 200, 0., 200.));
       addnSP(h, new TH1F("trecsim_fromtracks", "vertex time residual from tracks", 200, -0.1, 0.1));
       addnSP(h, new TH1F("trecerr_fromtracks", "vertex time error from tracks", 500, 0., 0.1));
       addnSP(h, new TH1F("trecsimpull_fromtracks", "tpull from tracks", 200, -10., 10.));
@@ -1650,6 +1668,9 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
       addnSP(h, new TH1F("trecerr","trec uncertainty", 500, 0.0, 0.1));
       addnSP(h, new TProfile("trecerrvsntrkprof","trec uncertainty vs # of timing tracks", 100, 0., 100, 0.0, 0.1));
       addnSP(h, new TH2F("trecerrvsntrk","trec uncertainty vs # of timing tracks", 100, 0., 100, 200, -0.1, 0.1));
+
+      addnSP(h, new TH1F("trecsim_sigmatlt01", "trec - tsim (sigma_t lt 0.1)", 200, -0.1, 0.1));
+      addnSP(h, new TH1F("trecsimpull_sigmatlt01", "tpull from vertex (sigma_t lt 0.1)", 200, -10., 10.));
     }
     dir->cd();
   }// vtypes
@@ -1670,6 +1691,8 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
                            "hiptcentral",
                            "unmatchedVtx",
                            "seltpmatched",
+                           "seltpmatchedSignal",
+                           "seltpmatchedPU",
                            "seltpunmatched",
                            "seltpmatched_tgt1",
 			   "MTDtail",
@@ -1961,6 +1984,7 @@ std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDire
   // for analyzeVertexCollectionSimPvNoSimTracks
   add(h, new TH1F("simPU", "number of simulated vertices", vmax, 0., float(vmax)));  // possible duplication -> "npu"
   add(h, new TH1F("dzrecsim", "distance of sim vertex", nbinzdiffrec, -2., 2.));
+  add(h, new TH1F("dzrecsimother", "distance of sim vertex not matched to this recvertex", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("dzrecsimptmax2lt04", "distance of sim vertex ptmax2 < 0.4", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("dzrecsimptmax2gt04", "distance of sim vertex ptmax2 > 0.4", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("dzrecsimmin", "distance of nearest sim vertex", nbinzdiffrec, -2., 2.));
@@ -2337,6 +2361,7 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
   add(hTrk, new TH1F("terrtrk_rec_sel", "reconstructed t error for all selected tracks", 200, 0., 0.2));
   add(hTrk, new TH1F("tqualtrk_rec_all", "time quality for all", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("tqualtrk_rec_sel", "time quality for all selected tracks", 200, tqualmin, tqualmax));
+  add(hTrk, new TH1F("tqualtrk_sigmat01_rec_sel", "time quality for all selected tracks with sigma_t < 0.1", 200, tqualmin, tqualmax));
 
   add(hTrk, new TH1F("ttrk_rec_sel_wide", "reconstructed t for selected tracks", 200, -10., 10.));
   add(hTrk, new TH1F("ttrk_rec_sel", "reconstructed t for selected tracks", 200, -1., 1.));
@@ -2354,12 +2379,21 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
   add(hTrk, new TH1F("tqualtrk_rec_selmatched_endcap_lopt", "time quality for matched selected tracks", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("ttrk_sim_selmatched", "simulated t for matched selected tracks", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_selmatched", "reconstructed t - simulated t for matched selected tracks", 200, -1., 1.));
+
   add(hTrk, new TH1F("trestrk_selmatched_qgt08", "reconstructed t - simulated t for matched selected tracks, quality > 0.8", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_selmatched_q0508", "reconstructed t - simulated t for matched selected tracks, quality = 0.5 .. 0.8", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_selmatched_qlt05", "reconstructed t - simulated t for matched selected tracks, quality < 0.5", 200, -1., 1.));
   add(hTrk, new TH1F("tpulltrk_selmatched_qgt08", "normalized trec-tsim  for matched selected tracks, quality > 0.8 ", 200, -10., 10.));
   add(hTrk, new TH1F("tpulltrk_selmatched_q0508", "normalized trec-tsim  for matched selected tracks, quality = 0.5 .. 0.8", 200, -10., 10.));
   add(hTrk, new TH1F("tpulltrk_selmatched_qlt05", "normalized trec-tsim  for matched selected tracks, quality < 0.5 ", 200, -10., 10.));
+
+  add(hTrk, new TH1F("trestrk_sigmatlt01_selmatched_qgt08", "reconstructed t - simulated t for matched selected tracks, quality > 0.8", 200, -1., 1.));
+  add(hTrk, new TH1F("trestrk_sigmatlt01_selmatched_q0508", "reconstructed t - simulated t for matched selected tracks, quality = 0.5 .. 0.8", 200, -1., 1.));
+  add(hTrk, new TH1F("trestrk_sigmatlt01_selmatched_qlt05", "reconstructed t - simulated t for matched selected tracks, quality < 0.5", 200, -1., 1.));
+  add(hTrk, new TH1F("tpulltrk_sigmatlt01_selmatched_qgt08", "normalized trec-tsim  for matched selected tracks, quality > 0.8 ", 200, -10., 10.));
+  add(hTrk, new TH1F("tpulltrk_sigmatlt01_selmatched_q0508", "normalized trec-tsim  for matched selected tracks, quality = 0.5 .. 0.8", 200, -10., 10.));
+  add(hTrk, new TH1F("tpulltrk_sigmatlt01_selmatched_qlt05", "normalized trec-tsim  for matched selected tracks, quality < 0.5 ", 200, -10., 10.));
+
   add(hTrk, new TH1F("trestrk_selmatched_barrel", "reconstructed t - simulated t for matched selected tracks (barrel)", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_selmatched_endcap", "reconstructed t - simulated t for matched selected tracks (endcap)", 200, -1., 1.));
   add(hTrk, new TH1F("trestrk_selmatched_barrel_hipt", "reconstructed t - simulated t for matched selected tracks (barrel, pt>1)", 200, -1., 1.));
@@ -2389,6 +2423,7 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
   add(hTrk, new TH1F("tpulltrk_selkaon", "normalized trec-tsim  for matched selected kaons", 200, -10., 10.));
   add(hTrk, new TH1F("tpulltrk_selproton", "normalized trec-tsim  for matched selected protons", 200, -10., 10.));
 
+  add(hTrk, new TH1F("tqualtrk_sigmat01_selmatched", "time quality for matched tracks with sigma_t < 0.1", 200, tqualmin, tqualmax));
   add(hTrk, new TH1F("tpulltrk_sigmat01_selmatched", "normalized trec-tsim  for matched selected tracks", 200, -10., 10.));
   add(hTrk, new TH1F("tpulltrk_sigmat01_selpion", "normalized trec-tsim  for matched selected pions", 200, -10., 10.));
   add(hTrk, new TH1F("tpulltrk_sigmat01_selkaon", "normalized trec-tsim  for matched selected kaons", 200, -10., 10.));
@@ -3930,7 +3965,9 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosNoTracks(std::map<std::string, TH
     Fill(h, vtype + "/logndof", log(v->ndof()) / log(10.));
   }
   Fill(h, vtype + "/vtxndfvsntrk", v->tracksSize(), v->ndof());
-  Fill(h, vtype + "/avweight", (v->ndof() + 2.) / (2. * v->tracksSize()), v->ndof());
+  Fill(h, vtype + "/avweight", (v->ndof() + 2.) / (2. * v->tracksSize()));
+  Fill(h, vtype + "/avweightvsndof", (v->ndof() + 2.) / (2. * v->tracksSize()), v->ndof());
+  Fill(h, vtype + "/avweightX", (v->ndof() + 2.) / (2. * v->tracksSize()), v->ndof()); // avweight weighted with ndof
   Fill(h, vtype + "/errx", v->xError());
   Fill(h, vtype + "/erry", v->yError());
   Fill(h, vtype + "/errz", v->zError());
@@ -4068,13 +4105,17 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   const SimEvent& simevt = simEvt[rs.sim];
   
   unsigned int ntiming = 0;
+  unsigned int ntiming_qual05 = 0;
+  unsigned int ntiming_qual08 = 0;
   unsigned int nseltrk = 0;
   for (trackit_t tv = v->tracks_begin(); tv != v->tracks_end(); tv++) {
     nseltrk++;
     if(f4D_){
-      auto t = tracks.from_ref(*tv);
-      if (t.has_timing) {
+      auto tk = tracks.from_ref(*tv);
+      if (tk.has_timing) {
 	ntiming++;
+	if (tk.timeQuality > 0.5) ntiming_qual05++;
+	if (tk.timeQuality > 0.8) ntiming_qual08++;
       }
     }
   }
@@ -4103,6 +4144,8 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   if (f4D_)
     {
       Fill(h, vtype + "/ntimingvtx", float(ntiming), simevt.is_signal());
+      Fill(h, vtype + "/ntimingqual05vtx", float(ntiming_qual05), simevt.is_signal());
+      Fill(h, vtype + "/ntimingqual08vtx", float(ntiming_qual08), simevt.is_signal());
       
       double t_fromtracks, tError_fromtracks;
       bool timing_from_tracks = vertex_time_from_tracks(*v, tracks, t_fromtracks, tError_fromtracks);
@@ -4113,6 +4156,10 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       Fill(h, vtype + "/trecsimpull", (v->t() - tsim) / v->tError(), simevt.is_signal());
       Fill(h, vtype + "/trecerrvsntrkprof", float(ntiming), v->tError(), simevt.is_signal());
       Fill(h, vtype + "/trecerrvsntrk", float(ntiming), v->tError(), simevt.is_signal());
+      if( v->tError() < 0.1){
+	Fill(h, vtype + "/trecsim_sigmatlt01", v->t() - tsim, simevt.is_signal());
+	Fill(h, vtype + "/trecsimpull_sigmatlt01", (v->t() - tsim) / v->tError(), simevt.is_signal());
+      }
       
       if (timing_from_tracks)
 	{
@@ -4596,6 +4643,7 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
       Fill(hTrk, "ttrk_rec_sel", tk.t);
       Fill(hTrk, "terrtrk_rec_sel", tk.dt);
       Fill(hTrk, "tqualtrk_rec_sel", tk.timeQuality);
+      if(tk.dt < 0.1)  Fill(hTrk, "tqualtrk_sigmat01_rec_sel", tk.timeQuality);
 
       if (tk.matched) {
         Fill(hTrk, "ttrk_rec_selmatched_wide", tk.t);
@@ -4609,6 +4657,7 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
 	if(tk.dt < 0.1)
 	  {
 	    Fill(hTrk, "tpulltrk_sigmat01_selmatched", (tk.t - tk.tsim) / tk.dt);
+	    Fill(hTrk, "tqualtrk_sigmat01_selmatched", tk.timeQuality);
 	    if(fabs(tk.eta) <  1.4)
 	      {// barrel timing layer
 		Fill(hTrk, "trestrk_selmatched_barrel", tk.t - tk.tsim);
@@ -4658,12 +4707,24 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
 	if (tk.timeQuality > 0.8){
 	  Fill(hTrk, "trestrk_selmatched_qgt08", tk.t - tk.tsim);
 	  Fill(hTrk, "tpulltrk_selmatched_qgt08", (tk.t - tk.tsim) / tk.dt );
+	  if (tk.dt < 0.1){
+	    Fill(hTrk, "trestrk_sigmatlt01_selmatched_qgt08", tk.t - tk.tsim);
+	    Fill(hTrk, "tpulltrk_sigmatlt01_selmatched_qgt08", (tk.t - tk.tsim) / tk.dt );
+	  }
 	}else if(tk.timeQuality < 0.5){
 	  Fill(hTrk, "trestrk_selmatched_qlt05", tk.t - tk.tsim);
 	  Fill(hTrk, "tpulltrk_selmatched_qlt05", (tk.t - tk.tsim) / tk.dt );
-	}else if((tk.timeQuality >= 0.5)&&(tk.timeQuality <= 0.5)){
-	  Fill(hTrk, "trestrk_selmatched_q0508", tk.t - tk.tsim);
-	  Fill(hTrk, "tpulltrk_selmatched_q0508", (tk.t - tk.tsim) / tk.dt );
+	  if (tk.dt < 0.1){
+	    Fill(hTrk, "trestrk_sigmatlt01_selmatched_qlt05", tk.t - tk.tsim);
+	    Fill(hTrk, "tpulltrk_sigmatlt01_selmatched_qlt05", (tk.t - tk.tsim) / tk.dt );
+	  }
+	}else if((tk.timeQuality >= 0.5) && (tk.timeQuality <= 0.8)){
+	  Fill(hTrk, "trestrk_sigmatlt01_selmatched_q0508", tk.t - tk.tsim);
+	  Fill(hTrk, "tpulltrk_sigmatlt01_selmatched_q0508", (tk.t - tk.tsim) / tk.dt );
+	  if (tk.dt < 0.1){
+	    Fill(hTrk, "trestrk_selmatched_q0508", tk.t - tk.tsim);
+	    Fill(hTrk, "tpulltrk_selmatched_q0508", (tk.t - tk.tsim) / tk.dt );
+	  }
 	}
 	  
 	
@@ -5317,6 +5378,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
   e.nChTP = 0;
   e.ptvis = 0;
   e.sumpt = 0;
+  e.sumpt2 = 0;
   e.pxvis = 0;
   e.pyvis = 0;
   e.sumpt2 = 0;
@@ -8269,6 +8331,11 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       if (recvmatch[iv].is_real()) {
         ntprealsel++;
 	fillVertexHistosMatched(h, "matchedvtxsel",  &(recVtxs->at(iv)), tracks, recvmatch[iv], simEvt, deltaz);
+	if(recvmatch[iv].is_signal()){
+	  fillVertexHistosMatched(h, "matchedsignalvtxsel",  &(recVtxs->at(iv)), tracks, recvmatch[iv], simEvt, deltaz);
+	}else{
+	  fillVertexHistosMatched(h, "matchedpuvtxsel",  &(recVtxs->at(iv)), tracks, recvmatch[iv], simEvt, deltaz);
+	}
       }
       if (recvmatch[iv].split_from() >= 0) {
         ntpsplitsel++;
@@ -8576,9 +8643,10 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
     Fill(h, "eff4TP", w4, is_signal);
     Fill(h, "effvsnsimevt", npu, w, is_signal);
     Fill(h, "eff4vsnsimevt", npu, w4, is_signal);
-    Fill(h, "effvsnrectp", float(simEvt.at(iev).tk.size()), w4);
-    Fill(h, "effvsngentp", float(simEvt.at(iev).nChTP), w4);
-    Fill(h, "effvssumpt", float(simEvt.at(iev).sumpt), w4);
+    Fill(h, "effvsnrectp", float(simEvt.at(iev).tk.size()), w4, is_signal);
+    Fill(h, "effvsngentp", float(simEvt.at(iev).nChTP), w4, is_signal);
+    Fill(h, "effvssumpt", float(simEvt.at(iev).sumpt), w4, is_signal);
+    Fill(h, "effvssumpt2", float(simEvt.at(iev).sumpt2), w4, is_signal);
 
     if ((w == 0) && (is_signal)) {
       reportEvent(
@@ -8599,10 +8667,12 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
            << "  nChTP=" << simEvt.at(iev).tk.size() << endl;
     }
 
+    /* obsolete, remove
     if (iev == 0) {
       Fill(h, "effsigvsnrectp", float(simEvt.at(iev).tk.size()), w);
       Fill(h, "effsigvsngentp", float(simEvt.at(iev).nChTP), w);
     }
+    */
   }
 
   // some more vertex quantities
@@ -9194,7 +9264,8 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionPtvis(std::map<std::string
     Fill(h, Form("ptvis/ptvis%d", i), ptvis[i] / ptvis0);
     Fill(h, Form("ptvis/ptvis%dvsz", i), zvtx,ptvis[i] / ptvis0 );
     Fill(h, Form("ptvis/ptvis%dvspu", i), simPU_, ptvis[i] / ptvis0);
-    Fill(h, Form("ptvis/ptvis%dvsdensity", i), density,  ptvis[i] / ptvis0);
+    Fill(h, Form("ptvis/ptvis%dvsdensity", i), density,  ptvis[i] / ptvis0); 
+
 
     double ptmiss = sqrt(px[i] * px[i] + py[i] * py[i]);
     double ptmiss_sim = sqrt(pow(simEvt[0].pxvis, 2) + pow(simEvt[0].pyvis, 2));
@@ -10132,6 +10203,11 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
 	    fillTrackHistos(h, "hiptcentral", tk);
           if (abs(tk.t) > 1.0)
             fillTrackHistos(h, "seltpmatched_tgt1", tk);
+	  if (tk.simEvt == 0){
+            fillTrackHistos(h, "seltpmatchedSignal", tk);
+	  }else{
+            fillTrackHistos(h, "seltpmatchedPU", tk);
+	  }
           Fill(h, "matchedselfractionvsz", tk.z, 1.);
           Fill(h, "unmatchedselfractionvsz", tk.z, 0.);
         } else {
