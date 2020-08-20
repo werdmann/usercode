@@ -54,6 +54,7 @@ parameters={  # can be overwritten by arguments of the same name
   "nDump":cms.untracked.int32(0),
 #  "mintrkweight":cms.untracked.double(0.5),
   "uniquetrkweight":cms.double(0.8),
+  "uniquetrkminp":cms.double(0.0),
   "zmerge":cms.double(1.e-2),
   "coolingFactor":cms.double(0.6),
   "Tmin": cms.double(0), # 0 = not set, use default
@@ -80,7 +81,10 @@ parameters={  # can be overwritten by arguments of the same name
   "maxD0Error":cms.double(1.0),
 # vertex selection
   "minNdof": cms.double( 0.0 ),
-  "trackTimeQualityThreshold" : cms.untracked.double(0.5)
+  "trackTimeQualityThreshold" : cms.double(0.8),
+#
+  "purge_method" : cms.untracked.int32(0),
+  "split_method" : cms.untracked.int32(0)
 }
 
 # temporary fix, should not be needed
@@ -179,7 +183,7 @@ for a in args:
         elif typename == "untracked bool":
             parameters[key] = cms.untracked.bool( value == "True")
     else:
-        print "!! unknown key ",key
+        print "!! pvt_cfg.py  :  unknown key ",key
 
 
 print "pvt_cfg.py"
@@ -333,13 +337,17 @@ if DO_VTX_RECO:
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.vertexSize = parameters["vertexSize"]
-    #process.unsortedOfflinePrimaryVertices.TkClusParameters.algorithm = parameters["clustering"]
+    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
+    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
+    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
+    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zmerge = parameters["zmerge"]
+
     process.unsortedOfflinePrimaryVertices.TkFilterParameters = tkFilterParameters.clone()
     #
     for p in (process.unsortedOfflinePrimaryVertices4DnoPID, process.unsortedOfflinePrimaryVertices4D):
         p.verbose = parameters["verboseProducer"]
-        p.TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"]#cms.untracked.double(0.5);
-        p.TrackTimeQualityMapLabel = cms.untracked.InputTag("mtdTrackQualityMVA:mtdQualMVA")
+        p.TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"]
+        p.TrackTimeQualityMapLabel = cms.InputTag("mtdTrackQualityMVA:mtdQualMVA")
         #p.new = parameters["newClusterizer"]
         p.TkClusParameters.TkDAClusParameters.verbose =  parameters["verboseClusterizer2D"]
         p.TkClusParameters.TkDAClusParameters.zdumpcenter = parameters["zdumpcenter"]
@@ -349,7 +357,7 @@ if DO_VTX_RECO:
         p.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
         p.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
         # remember to put any parameter used here into msub.py
-        for par_name in ("Tmin", "Tpurge", "vertexSizeTime"):
+        for par_name in ("Tmin", "Tpurge", "zmerge", "vertexSizeTime", "uniquetrkminp"):
             if parameters[par_name] > 0:
                 setattr(p.TkClusParameters.TkDAClusParameters, par_name, parameters[par_name])
 
@@ -381,7 +389,7 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     TrackTimesLabel = cms.untracked.InputTag("tofPID4DnoPID:t0safe"),  # as opposed to "tofPID:t0safe"
     TrackTimeResosLabel = cms.untracked.InputTag("tofPID4DnoPID:sigmat0safe"),
     TrackTimeQualityMapLabel = cms.untracked.InputTag("mtdTrackQualityMVA:mtdQualMVA"),
-    TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"],
+    TrackTimeQualityThreshold = cms.untracked.double( parameters["trackTimeQualityThreshold"].value()),
     vertexAssociator = cms.untracked.InputTag("VertexAssociatorByPositionAndTracks"),
     useVertexFilter = cms.untracked.bool(False),
     compareCollections = cms.untracked.int32(0),

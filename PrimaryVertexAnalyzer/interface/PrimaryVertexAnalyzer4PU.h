@@ -666,6 +666,8 @@ private:
   double vertex_aptsum(const reco::Vertex&);
   double vertex_r(const reco::Vertex&);
   double vertex_ptmax2(const reco::Vertex&);
+  double vertex_sumpt2(const reco::Vertex&);
+  double vertex_sumpt(const reco::Vertex&);
   bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
 
   bool select(const reco::Vertex&, const int level = 0);
@@ -872,12 +874,14 @@ private:
   void fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                 const std::string& vtype,
                                 const reco::Vertex* v = NULL,
+				const int index = -1, 
                                 const double deltaz = 0,
                                 const bool verbose = false);
   void fillVertexHistos(std::map<std::string, TH1*>& h,
                         const std::string& vtype,
                         const reco::Vertex* v,
                         Tracks& tracks,
+			const int index = -1,
                         const double deltaz = 0,
                         const bool verbose = false);
   void fillVertexHistosMatched(std::map<std::string, TH1*>& h,
@@ -886,6 +890,7 @@ private:
 			       Tracks& tracks,
 			       const RSmatch& rs,
 			       const std::vector<SimEvent>& simEvt,
+                               const int index = -1,
 			       const double deltaz = 0,
 			       const bool verbose = false);
   
@@ -1080,6 +1085,7 @@ private:
   int emptyeventcounter_;
   int autoDumpCounter_;
   int ndump_;
+  int ndump_tracks_;
   long long int run_;
   int luminosityBlock_;
   long long int event_;
@@ -1167,10 +1173,11 @@ private:
 
   // control verbosity for some report types
   static constexpr bool dump_signal_vertex_not_tpmatched_ = true;
-  static constexpr bool dump_fake_vertex_on_top_of_signal_ = true;
-  static constexpr bool dump_big_fakes_ = true;
+  static constexpr bool dump_fake_vertex_on_top_of_signal_ = false;
+  static constexpr bool dump_big_fakes_ = false;
   
   bool f4D_;
+  bool fTrackTime_;
 
   bool RECO_;
   double instBXLumi_;
