@@ -666,6 +666,8 @@ private:
   double vertex_aptsum(const reco::Vertex&);
   double vertex_r(const reco::Vertex&);
   double vertex_ptmax2(const reco::Vertex&);
+  double vertex_yum(const reco::Vertex&);
+  double vertex_maxfrac(const reco::Vertex&);
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
   bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
@@ -1269,6 +1271,8 @@ private:
   double simPU_;
 
   std::vector<std::string> reports_;
+
+  std::vector<std::string> trkdzbin_{"dz000-100","dz100-200","dz200-500","dz500-1000","dzgt1000"};
 
   std::vector<double> dzbins_{0.0050,
                               0.0150,
