@@ -21,6 +21,7 @@ zdumpcenter = 0
 zdumpwidth = 100.
 use_tp = True
 use_hlt = False
+use_2file_solution = False
 
 json = "goodList.json"
 era = "Run3"  # or Phase2 or Run2_2018,  see eras.__dict__.keys()
@@ -47,12 +48,13 @@ parameters={  # can be overwritten by arguments of the same name
   "4D": cms.untracked.bool(False),
 #  "splitmethod":cms.untracked.int32(0),
   "usefit":cms.untracked.bool(False),
+  "usetp":cms.untracked.bool(False),
+  "use2file":cms.untracked.bool(False),
   "ptrunc":cms.untracked.double(1.e-50),
   "fplo":cms.untracked.double(0),
   "chi2cutoff":cms.double(2.5), 
   "verboseAnalyzer":cms.untracked.bool(False),
   "verboseProducer":cms.untracked.bool(False),
-  "fastClusterizer":cms.untracked.bool(False),
   "verboseClusterizer":cms.untracked.bool(False),
   "verboseClusterizer2D":cms.untracked.bool(False),
   "zdumpcenter" : cms.untracked.double(0.0),
@@ -146,6 +148,13 @@ for a in args:
 
     elif key == "use_genHTFilter":
         use_genHTFilter = (value in ("True","yes","Yes") )
+
+    elif key in ("usetp", "use_tp", "useTP", "use_TP"):
+        use_tp = (value in ("True", "yes", "Yes"))
+
+    elif key in ("use2file",):
+        use_2file_solution = (value in ("True", "yes", "Yes"))
+
     elif key == "zdump":
         debug = True
         try:
@@ -176,9 +185,6 @@ for a in args:
             parameters["verboseClusterizer"] = cms.untracked.bool(True)
             parameters["verboseAnalyzer"] = cms.untracked.bool(True)
             parameters["verboseProducer"] = cms.untracked.bool(True)
-    elif key == "fast":
-        if (value in ("True","yes","Yes") ):
-            parameters["fastClusterizer"] = cms.untracked.bool(True)
     elif key == "info":
         info  = value
     elif key in parameters.keys():
@@ -202,7 +208,7 @@ for a in args:
         print "!! pvt_cfg.py  :  unknown key ",key
 
 
-if len(files) > 0:
+if use_2file_solution and len(files) > 0:
     fpath = "/store" + files[0].split("/store")[1]
     raw_files = subprocess.check_output(shlex.split('dasgoclient -query="parent file=%s"' % fpath)).strip().split('\n')
     print raw_files
@@ -218,7 +224,6 @@ print "info           ",info
 print "json           ",json
 print "era            ",era
 print "DO_VTX_RECO    ",DO_VTX_RECO
-print "fastClusterizer ",parameters["fastClusterizer"]
 print "all parameters"
 print parameters
 if len(source_files) == 0:
@@ -233,6 +238,7 @@ if era == "Phase2":
 elif era == "Run3":
     process = cms.Process("RERECO", eras.Run3)
     autotag = "111X_mcRun3_2021_realistic_v4"
+    autotag = "113X_mcRun3_2021_realistic_v1"
     parameters["4D"] = cms.untracked.bool(False)
 else:
     print "unknown era",era
@@ -265,7 +271,7 @@ process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
 #process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')  
 
-if True and use_tp:
+if use_tp:
     process.load("Validation.RecoTrack.TrackValidation_cff")
     process.theTruth = cms.Sequence(
         process.tpClusterProducer +
@@ -286,6 +292,7 @@ else:
     process.source = cms.Source("PoolSource",
                                 fileNames = source_files,
                                 secondaryFileNames = secondary_files,
+                                inputCommands = cms.untracked.vstring('drop *_muonReducedTrackExtras_*_*')
                                 #eventsToProcess = cms.untracked.VEventRange()
                             )
 
@@ -350,31 +357,20 @@ tkFilterParameters = cms.PSet(
 if DO_VTX_RECO:
     process.PV = cms.Path(process.vertexreco)
 
-    if False:
-        print "1d"
-        print process.unsortedOfflinePrimaryVertices.TkFilterParameters
-        print process.unsortedOfflinePrimaryVertices.TkClusParameters
-        print "noPID"
-        print process.unsortedOfflinePrimaryVertices4DnoPID.TkFilterParameters
-        print process.unsortedOfflinePrimaryVertices4DnoPID.TkClusParameters
-        print "PID"
-        print process.unsortedOfflinePrimaryVertices4D.TkFilterParameters
-        print process.unsortedOfflinePrimaryVertices4D.TkClusParameters
 
     process.unsortedOfflinePrimaryVertices.verbose = parameters["verboseProducer"]
     process.unsortedOfflinePrimaryVertices.vertexCollections[0].minNdof = parameters["minNdof"]
-    #process.unsortedOfflinePrimaryVertices.fast = parameters["fastClusterizer"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.verbose =  parameters["verboseClusterizer"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zrange = parameters["zrange"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.convergence_mode = parameters["convergence_mode"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.vertexSize = parameters["vertexSize"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_hitpattern = parameters["use_hitpattern"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_pt = parameters["use_pt"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_hitpattern = parameters["use_hitpattern"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_pt = parameters["use_pt"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zmerge = parameters["zmerge"]
     #for par_name in (
     #        "Tmin", "Tpurge", "vertexSize", "delta_lowT", "delta_highT", 
@@ -421,6 +417,7 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     nDump = parameters["nDump"],
     nDumpTracks = parameters["nDumpTracks"],
     RECO = parameters["reco"],
+    use_tp = cms.untracked.bool(use_tp),
     track_timing = cms.untracked.bool(True),
     TkFilterParameters = tkFilterParameters,
     trackingParticleCollection = cms.untracked.InputTag("mix", "MergedTrackTruth"),

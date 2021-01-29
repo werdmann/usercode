@@ -72,7 +72,6 @@
 #include "DataFormats/SiPixelDetId/interface/PXBDetId.h"
 #include "DataFormats/SiPixelDetId/interface/PXFDetId.h"
 #include "DataFormats/SiPixelDetId/interface/PixelSubdetector.h"
-#include "DataFormats/SiPixelDetId/interface/PixelBarrelName.h"
 
 // some of this probably redundant or unused
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"

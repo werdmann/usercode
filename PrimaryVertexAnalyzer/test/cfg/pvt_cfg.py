@@ -83,8 +83,8 @@ parameters={  # can be overwritten by arguments of the same name
   "minNdof": cms.double( 0.0 ),
   "trackTimeQualityThreshold" : cms.double(0.8),
 #
-  "purge_method" : cms.untracked.int32(0),
-  "split_method" : cms.untracked.int32(0)
+  #"purge_method" : cms.untracked.int32(0),
+  #"split_method" : cms.untracked.int32(0)
 }
 
 # temporary fix, should not be needed
@@ -129,6 +129,12 @@ for a in args:
             era = "Phase2"
     elif key == "redopv" or key == "redoPV":
         DO_VTX_RECO = (value in ("True","yes","Yes") )
+
+    elif key in ("usetp", "use_tp", "useTP", "use_TP"):
+        use_tp = (value in ("True", "yes", "Yes"))
+
+    elif key in ("use2file",):
+        use_2file_solution = (value in ("True", "yes", "Yes"))
 
     elif key == "zdump":
         debug = True
@@ -240,7 +246,7 @@ if era == "Run3":
 elif era== "Phase2":
     process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')  
 
-if True and use_tp:
+if use_tp:
     print "heyho", "*"*40
     process.load("Validation.RecoTrack.TrackValidation_cff")
     process.theTruth = cms.Sequence(
@@ -337,18 +343,18 @@ if DO_VTX_RECO:
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.vertexSize = parameters["vertexSize"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zmerge = parameters["zmerge"]
 
     process.unsortedOfflinePrimaryVertices.TkFilterParameters = tkFilterParameters.clone()
     #
     for p in (process.unsortedOfflinePrimaryVertices4DnoPID, process.unsortedOfflinePrimaryVertices4D):
         p.verbose = parameters["verboseProducer"]
-        p.TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"]
-        p.TrackTimeQualityMapLabel = cms.InputTag("mtdTrackQualityMVA:mtdQualMVA")
-        #p.new = parameters["newClusterizer"]
+        # track time quality mva not part of the standard code yet
+        #p.TrackTimeQualityThreshold = parameters["trackTimeQualityThreshold"]
+        #p.TrackTimeQualityMapLabel = cms.InputTag("mtdTrackQualityMVA:mtdQualMVA")
         p.TkClusParameters.TkDAClusParameters.verbose =  parameters["verboseClusterizer2D"]
         p.TkClusParameters.TkDAClusParameters.zdumpcenter = parameters["zdumpcenter"]
         p.TkClusParameters.TkDAClusParameters.zdumpwidth = parameters["zdumpwidth"]
@@ -357,7 +363,7 @@ if DO_VTX_RECO:
         p.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
         p.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
         # remember to put any parameter used here into msub.py
-        for par_name in ("Tmin", "Tpurge", "zmerge", "vertexSizeTime", "uniquetrkminp"):
+        for par_name in ("Tmin", "Tpurge", "zmerge", "vertexSizeTime"):
             if parameters[par_name] > 0:
                 setattr(p.TkClusParameters.TkDAClusParameters, par_name, parameters[par_name])
 
