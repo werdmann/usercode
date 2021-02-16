@@ -48,7 +48,7 @@ parameters={  # can be overwritten by arguments of the same name
   "4D": cms.untracked.bool(False),
 #  "splitmethod":cms.untracked.int32(0),
   "usefit":cms.untracked.bool(False),
-  "usetp":cms.untracked.bool(False),
+  "use_tp":cms.untracked.bool(False),
   "use2file":cms.untracked.bool(False),
   "ptrunc":cms.untracked.double(1.e-50),
   "fplo":cms.untracked.double(0),
@@ -93,9 +93,10 @@ parameters={  # can be overwritten by arguments of the same name
 # vertex selection
   "minNdof": cms.double( 0.0 ),
 # temp
+  "trackTimeQualityThreshold" : cms.untracked.double(0.8),
   "purge_method" : cms.untracked.int32(0),
   "split_method" : cms.untracked.int32(0),
-    "use_hitpattern" : cms.untracked.int32(0),
+  "use_hitpattern" : cms.untracked.int32(0),
   "use_pt" : cms.untracked.int32(0)
 }
 
@@ -268,8 +269,11 @@ process.load('Configuration.StandardSequences.Validation_cff')
 process.load('DQMOffline.Configuration.DQMOfflineMC_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
-process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
-#process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')  
+if era == "Run3":
+    process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
+elif era== "Phase2":
+    process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')  
+
 
 if use_tp:
     process.load("Validation.RecoTrack.TrackValidation_cff")
@@ -340,38 +344,80 @@ process.ak4CaloJetsForTrk.srcPVs = 'unsortedOfflinePrimaryVertices'
 process.vertexreco.remove(process.generalV0Candidates)
 process.vertexreco.remove(process.inclusiveVertexing)
 
-    
-tkFilterParameters = cms.PSet(
-    algorithm=cms.string('filter'),
-    maxNormalizedChi2 = parameters["maxNormalizedChi2"],
-    minPixelLayersWithHits = parameters["minPixelLayersWithHits"],
-    minSiliconLayersWithHits = parameters["minSiliconLayersWithHits"],
-    maxD0Significance = parameters["maxD0Significance"], 
-    maxD0Error = parameters["maxD0Error"], 
-    maxDzError = parameters["maxDzError"], 
-    minPt = parameters["minPt"],
-    maxEta = parameters["maxEta"],
-    trackQuality = parameters["trackQuality"]
-    )
+# modify the track filter if needed
+tkFilterParameters = process.unsortedOfflinePrimaryVertices.TkFilterParameters.clone()    
+
+for par_name in ("maxNormalizedChi2", "minPixelLayersWithHits", 
+                 "minSiliconLayersWithHits", "maxD0Significance",
+                 "maxD0Error", "maxDzError", "minPt", "maxEta", "trackQuality"):
+    try:
+        default =  getattr(tkFilterParameters, par_name)
+        if default != parameters[par_name]:
+            print "changing tkFilter parameter ", par_name, " from ", default, "  to ", parameters[par_name]
+        setattr(tkFilterParameters, par_name, parameters[par_name])
+    except ValueError:
+        print "attribute tkFilterParameters.", par_name , " not found "
+
+print tkFilterParameters
+
+
+if False:    
+    tkFilterParameters = cms.PSet(
+        algorithm=cms.string('filter'),
+        maxNormalizedChi2 = parameters["maxNormalizedChi2"],
+        minPixelLayersWithHits = parameters["minPixelLayersWithHits"],
+        minSiliconLayersWithHits = parameters["minSiliconLayersWithHits"],
+        maxD0Significance = parameters["maxD0Significance"], 
+        maxD0Error = parameters["maxD0Error"], 
+        maxDzError = parameters["maxDzError"], 
+        minPt = parameters["minPt"],
+        maxEta = parameters["maxEta"],
+        trackQuality = parameters["trackQuality"]
+        )
 
 if DO_VTX_RECO:
     process.PV = cms.Path(process.vertexreco)
 
 
+    p = process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters
+    print p
+    for par_name in ("zrange", "convergence_mode", "delta_lowT", "delta_highT", "vertexSize", "zmerge"):
+        try:
+            default =  getattr(p, par_name)
+            if default != parameters[par_name]:
+                print "changing TkDAClusParameters parameter ", par_name, " from ", default, "  to ", parameters[par_name]
+            setattr(p, par_name, parameters[par_name])
+        except AttributeError:
+            print "attribute TkDAClusParameters.", par_name , " not found "
+
+            
+
+    p = process.unsortedOfflinePrimaryVertices.vertexCollections[0]
+    for par_name in ("minNdof",):
+        try:
+            default =  getattr(p, par_name)
+            if default != parameters[par_name]:
+                print "changing Vtx parameter ", par_name, " from ", default, "  to ", parameters[par_name]
+            setattr(p, par_name, parameters[par_name])
+        except AttributeError:
+            print "attribute Vtx Parameters.", par_name , " not found "
+
+    print process.unsortedOfflinePrimaryVertices
+
     process.unsortedOfflinePrimaryVertices.verbose = parameters["verboseProducer"]
-    process.unsortedOfflinePrimaryVertices.vertexCollections[0].minNdof = parameters["minNdof"]
+    #process.unsortedOfflinePrimaryVertices.vertexCollections[0].minNdof = parameters["minNdof"]
     process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.verbose =  parameters["verboseClusterizer"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zrange = parameters["zrange"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.convergence_mode = parameters["convergence_mode"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.vertexSize = parameters["vertexSize"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zrange = parameters["zrange"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.convergence_mode = parameters["convergence_mode"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_lowT = parameters["delta_lowT"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.delta_highT = parameters["delta_highT"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.vertexSize = parameters["vertexSize"]
     #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.uniquetrkminp = parameters["uniquetrkminp"]
     #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.purge_method = parameters["purge_method"]
     #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.split_method = parameters["split_method"]
     #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_hitpattern = parameters["use_hitpattern"]
     #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.use_pt = parameters["use_pt"]
-    process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zmerge = parameters["zmerge"]
+    #process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters.zmerge = parameters["zmerge"]
     #for par_name in (
     #        "Tmin", "Tpurge", "vertexSize", "delta_lowT", "delta_highT", 
     #        "convergence_mode", "zrange", "zmerge", "uniquetrkminp", 
@@ -425,6 +471,8 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     trackAssociatorMap = cms.untracked.InputTag("trackingParticleRecoTrackAsssociation"),
     TrackTimesLabel = cms.untracked.InputTag("tofPID4DnoPID:t0safe"),  # as opposed to "tofPID:t0safe"
     TrackTimeResosLabel = cms.untracked.InputTag("tofPID4DnoPID:sigmat0safe"),
+    TrackTimeQualityMapLabel = cms.untracked.InputTag("mtdTrackQualityMVA:mtdQualMVA"),
+    TrackTimeQualityThreshold = cms.untracked.double( parameters["trackTimeQualityThreshold"].value()),
     vertexAssociator = cms.untracked.InputTag("VertexAssociatorByPositionAndTracks"),
     useVertexFilter = cms.untracked.bool(False),
     compareCollections = cms.untracked.int32(0),

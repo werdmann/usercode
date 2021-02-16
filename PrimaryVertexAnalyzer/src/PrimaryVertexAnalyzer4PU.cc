@@ -193,7 +193,7 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
     trkTimesToken_ = consumes<edm::ValueMap<float>>(iConfig.getUntrackedParameter<edm::InputTag>("TrackTimesLabel"));
     trkTimeResosToken_ =
         consumes<edm::ValueMap<float>>(iConfig.getUntrackedParameter<edm::InputTag>("TrackTimeResosLabel"));
-    trkTimeQualityThreshold_ = iConfig.getUntrackedParameter<double>("TrackTimeQualityThreshold");
+    trkTimeQualityThreshold_ = iConfig.getUntrackedParameter<double>("TrackTimeQualityThreshold", 0.8);
     trkTimeQualityToken_ =  consumes<edm::ValueMap<float> >(iConfig.getUntrackedParameter<edm::InputTag>("TrackTimeQualityMapLabel"));
   } else {
     std::cout << "PrimaryVertexAnalyzer4PU: no timing" << std::endl;
@@ -3320,7 +3320,7 @@ void PrimaryVertexAnalyzer4PU::endJob() {
     int nbin = hist->second->GetNbinsX();
     double I = hist->second->GetBinContent(0) + hist->second->GetBinContent(nbin + 1) + hist->second->Integral();
     if (hist->second->GetEntries() > I) {
-      cout << "Warning !  possible bin content overflow in " << hist->first << "entries=" << hist->second->GetEntries()
+      cout << "Warning !  possible bin content overflow in '" << hist->first << "' entries=" << hist->second->GetEntries()
            << "   integral=" << I << endl;
     }
   }
@@ -8975,7 +8975,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       }else if (recvmatch[1].split_from() > 0){ 
 	Fill(h, "zdiffrec10-signalsplitfrompu", zdiff);
       }else{
-	Fill(h, "zdiffrec10-otherfake", zdiff);
+	Fill(h, "zdiffrec10-signalotherfake", zdiff);
       }
 
       if (recvmatch[1].is_real() &&  (fabs(zdiff) < 0.05)) reportEvent("real pu close to signal promoted to nr 2", false);
@@ -10443,7 +10443,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexRecoCPUTime(std::map<std::string, TH
       tclu = v->covariance(iX, iX);
       tfit = v->covariance(iY, iY);
       found_timing_info = true;
-      //std::cout << "extracted timing info " << message << " "  << tclu << " " << tfit << " " << endl;
+      //std::cout << "extracted timing info " << message << "  tclu = "  << tclu << " ms   tfit =" << tfit << " ms" << endl;
     } else {
       if (select(*v)) {
         nsel++;

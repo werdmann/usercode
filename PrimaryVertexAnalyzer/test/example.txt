@@ -1,4 +1,7 @@
-cmsRun cfg/pvt_cfg.py input=/store/relval/CMSSW_11_3_0_pre2/RelValZTT_14TeV/GEN-SIM-RECO/113X_mcRun4_realistic_v2_2026D49noPU-v2/10000/111b37c3-81f8-4c73-b523-666df0d3b20c.root events=10 info=RUN4PU redoPV=True 4D=True era=Phase2 maxEta=4.0 zrange=4. convergence_mode=0 delta_lowT=1e-3 delta_highT=1e-2
+#cmsRun cfg/pvt_cfg.py input=/store/relval/CMSSW_11_3_0_pre2/RelValZTT_14TeV/GEN-SIM-RECO/113X_mcRun4_realistic_v2_2026D49noPU-v2/10000/111b37c3-81f8-4c73-b523-666df0d3b20c.root events=10 info=RUN4noPU redoPV=True 4D=True era=Phase2 maxEta=4.0 zrange=4. convergence_mode=0 delta_lowT=1e-3 delta_highT=1e-2
 
-#cmsRun cfg/pv3_cfg.py input=/store/relval/CMSSW_11_3_0_pre1/RelValZpTT_1500_14/GEN-SIM-RECO/PU_113X_mcRun3_2021_realistic_v1-v1/10000/0eb0903f-fc80-4435-930d-618a4141156f.root events=10 info=RUN3 redoPV=True era=Run3 usetp=False
+#cmsRun cfg/pv3_cfg.py input=/store/relval/CMSSW_11_3_0_pre1/RelValZpTT_1500_14/GEN-SIM-RECO/PU_113X_mcRun3_2021_realistic_v1-v1/10000/0eb0903f-fc80-4435-930d-618a4141156f.root events=10 info=RUN3 redoPV=True era=Run3 use_tp=False
+
+
+cmsRun cfg/pvt_cfg.py input=/store/relval/CMSSW_11_3_0_pre1/RelValZEE_14/GEN-SIM-RECO/PU_113X_mcRun4_realistic_v1_2026D49PU200-v1/10000/01d84aad-27f3-46d8-8319-53b06e133ff4.root events=100 info=RUN4PU redoPV=True 4D=True era=Phase2
 
