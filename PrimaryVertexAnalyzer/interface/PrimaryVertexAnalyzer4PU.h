@@ -101,6 +101,9 @@
 #include <TObjString.h>
 #include <TString.h>
 
+// timing
+#include <chrono>
+
 #include "RecoVertex/PrimaryVertexProducer/interface/TrackFilterForPVFinding.h"
 
 typedef reco::Vertex::trackRef_iterator trackit_t;
@@ -170,6 +173,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
   class RecoTrack;  // forward declaration
 
+  
   // auxiliary class holding simulated events
   class SimEvent {
   public:
@@ -192,7 +196,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
       nwosmatch = 0;
       nwntmatch = 0;
-      recvnt.clear();  // FIXME rename to wnt
+      wnt.clear();  // formerly known as recvnt
       wos.clear();
 
       wos_dominated_recv.clear();    // list of wos dominated rec vertices
@@ -217,20 +221,21 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
     std::vector<const TrackingParticle*> tp;
 
-    std::vector<reco::TransientTrack> tk;              // deprecated
-    std::vector<reco::TransientTrack> tkprim;          // deprecated
-    std::vector<reco::TransientTrack> tkprimsel;       // deprecated
-    std::vector<edm::RefToBase<reco::Track> > trkref;  // deprecated
+    std::vector<reco::TransientTrack> tk;              // deprecated, use rtk instead
+    std::vector<reco::TransientTrack> tkprim;          // deprecated, use rktprim insted
+    std::vector<reco::TransientTrack> tkprimsel;       // deprecated, use rtkprimsel instead
+    std::vector<edm::RefToBase<reco::Track> > trkref;  // deprecated, don't use at all
 
-    std::vector<RecoTrack> rtk;
-    std::vector<RecoTrack> rtkprim;
-    std::vector<RecoTrack> rtkprimsel;
-
-    std::vector<unsigned int> trkidx;  // what is this?
-    double sumpt2rec;
-    double sumpt2, sumpt;
-    double Tc, chisq, dzmax, dztrim, m4m2;
-    // rec vertex matching
+    std::vector<RecoTrack> rtk;              // all selected RecoTracks matched to this simevent
+    std::vector<RecoTrack> rtkprim;          // all selected RecoTracks matched to this simevent that come from within 5 microns of the simvertex
+    std::vector<RecoTrack> rtkprimsel;       // all selected RecoTracks matched to this simevent that pass the ip/sigma(ip) < 4 cut (rec wrt beam) ?????
+    std::vector<unsigned int> trkidx;        // list of RecoTrack indices, used anywher?
+    
+    double Tc, chisq, dzmax, dztrim, m4m2;  // filled by getSimEvents via "getTc"
+    double sumpt2, sumpt;                   // filled by getSimEvents
+    double sumpt2rec;                       // who fills this?
+    
+    // rec vertex matching                 // this block should be obsolete
     int nmatch, nmatch2;
     double zmatchn, zmatchn2;
     double pmatchn, pmatchn2;
@@ -244,7 +249,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     // number of tracks in recvtx with index i (VertexCollection->at(i))
     std::map<unsigned int, int> ntInRecVi;
 
-    std::map<unsigned int, double> recvnt;  // weighted number of tracks in recvtx (by index)
+    std::map<unsigned int, double> wnt;     // weighted number of tracks in recvtx (by index)
     std::map<unsigned int, double> wos;     // sum of wos in recvtx (by index) // oops -> this was int before 04-22
     double sumwos;                          // sum of wos in any recvtx
     double sumwt;                           // sum of weighted tracks
@@ -261,10 +266,10 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
     void addTrack(unsigned int irecv, double twos, double wt) {
       sumwt += wt;
-      if (recvnt.find(irecv) == recvnt.end()) {
-        recvnt[irecv] = wt;
+      if (wnt.find(irecv) == wnt.end()) {
+        wnt[irecv] = wt;
       } else {
-        recvnt[irecv] += wt;
+        wnt[irecv] += wt;
       }
 
       sumwos += twos;
@@ -285,6 +290,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     }
 
     int countVertexTracks(const reco::Vertex& v, double min_weight = 0.5) {
+      // count the number of tracks from this simevent in recvertex v
       int n = 0;
       for (trackit_t t = v.tracks_begin(); t != v.tracks_end(); t++) {
         if (v.trackWeight(*t) >= min_weight) {
@@ -329,7 +335,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     unsigned int max_nt_vtx() {
       double maxnt = 0.;
       unsigned int vtx = NOT_MATCHED;
-      for (auto it : recvnt) {
+      for (auto it : wnt) {
         if (it.second > maxnt) {
           maxnt = it.second;
           vtx = it.first;
@@ -349,7 +355,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       nwosmatch = 0;
       wos_dominated_recv.clear();
 
-      recvnt.clear();
+      wnt.clear();
       nwntmatch = 0;
     }
     
@@ -1004,7 +1010,8 @@ private:
                                    const reco::Vertex& v,
 				   Tracks& tracks,
                                    RSmatch& rs,
-                                   std::vector<SimEvent>& simEvt);
+                                   std::vector<SimEvent>& simEvt,
+				   float npu);
 
   std::vector<RSmatch> tpmatch(const reco::VertexCollection* recVtxs,
                                std::vector<SimEvent>& simEvt,
@@ -1058,6 +1065,32 @@ private:
   std::vector<bool> trackClass(const reco::Track&);
 
   void report_counted(std::string msg, const int max_count);
+  
+  void set_ndof_globals(std::string & vertexcollection){
+    // ndof with and without beam constraint:
+    //                                 0    1   2   3   4   5 
+    // no BS    ndof = 2 * nt - 3     -3   -1   1   3   5   7
+    // withBS   ndof = 2 * nt - 1     -1    1   3   5   7
+    // with an adaptive fitter, replace nt by <w>
+    // hence <w> = (ndof - ndof0trk_) / 2.
+    if (vertexcollection.find("WithBS") != std::string::npos){
+      selNdof_ = selNdofWithBS_;
+      ndof0trk_ = -1.;
+    }else{
+      selNdof_ = selNdofNoBS_;
+      ndof0trk_ = -3.;
+    }
+  }
+
+  //timers
+  std::map<std::string, std::chrono::time_point<std::chrono::steady_clock> > timer_start_;
+  std::map<std::string, double> timers_;
+  void inline timer_start(const std:: string label){timer_start_[label] = std::chrono::steady_clock::now();}
+  void timer_stop(const std::string & label){
+    auto stop = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - timer_start_[label]);
+    timers_[label] += duration.count();
+  }
 
   /*  --> EXTRAS
   bool getBXLumi_from_files();
@@ -1081,6 +1114,7 @@ private:
   bool dumpThisEvent_;
   bool forceDump_;
   int analyzeLS_;  //
+  bool fill_track_histos_;
   bool DEBUG_;
   int eventcounter_;
   int dumpcounter_;
@@ -1242,6 +1276,10 @@ private:
   double etaMaxVisible_;
   double ptMinVisible_;
   int numTrkHitsVisible_;
+  double selNdof_;
+  double selNdofWithBS_;
+  double selNdofNoBS_;
+  double ndof0trk_;
 
   static const int nzbins_ = 40;
   double zbinmax_;
@@ -1291,4 +1329,6 @@ private:
                               1.000,
                               2.000,
                               3.000};
+
+
 };
