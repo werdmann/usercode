@@ -25,6 +25,11 @@
 
 // Lumi
 #include "FWCore/Framework/interface/LuminosityBlock.h"
+#include "DataFormats/Luminosity/interface/LumiInfo.h"
+// obsolete?
+#include "DataFormats/Luminosity/interface/LumiDetails.h"
+#include "DataFormats/Luminosity/interface/LumiSummary.h"
+
 #include "DataFormats/Common/interface/ConditionsInEdm.h"
 
 // AOD et al
@@ -163,8 +168,7 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
       edmSimVertexContainerToken_(consumes<edm::SimVertexContainer>(iConfig.getParameter<edm::InputTag>("simG4"))),
       edmSimTrackContainerToken_(consumes<edm::SimTrackContainer>(iConfig.getParameter<edm::InputTag>("simG4"))),
       edmHepMCProductToken_(consumes<edm::HepMCProduct>(
-          edm::InputTag(std::string("generatorSmeared")))),  // starting with 3_1_0 pre something
-      //  , recoTrackToTrackingParticleAssociatorToken_(consumes<reco::TrackToTrackingParticleAssociator>(edm::InputTag("trackAssociatorByHits"))
+          edm::InputTag(std::string("generatorSmeared")))),
       trackingParticleCollectionToken_(consumes<TrackingParticleCollection>(
           iConfig.getUntrackedParameter<edm::InputTag>("trackingParticleCollection"))),
       trackingVertexCollectionToken_(
@@ -177,7 +181,8 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
           iConfig.getUntrackedParameter<edm::InputTag>("vertexAssociator"))),
       lumiDetailsToken_(consumes<LumiDetails, edm::InLumi>(edm::InputTag("lumiProducer"))),
       lumiSummaryToken_(consumes<LumiSummary, edm::InLumi>(edm::InputTag("lumiProducer"))),
-      lumiScalersToken_(consumes<LumiScalersCollection>(edm::InputTag("scalersRawToDigi")))
+      lumiInfoToken_(consumes<LumiInfo>(iConfig.getUntrackedParameter<edm::InputTag>("lumiInfoTag")))
+		    
 
 {
 
@@ -2702,99 +2707,24 @@ void PrimaryVertexAnalyzer4PU::bookEventHistograms(const char * directory_name)
   TDirectory* dir = rootFile_->mkdir(directory_name);
   dir->cd();
   add(hEvt, new TH1F("lbx", "instantaneous BX lumi (ub s bx)^-1", 100, 0., lumiHistoRange_));
-  //add(hEvt, new TH1F("lPU","instantaneous BX lumi x 69.1 mb",100, 0., lumiPUHistoRange_));
   add(hEvt, new TH1F("bunchCrossing", "bunchCrossing", 4000, 0., 4000.));
 }
 
 
 void PrimaryVertexAnalyzer4PU::get_luminosity_infos(const edm::Event& iEvent) {
-  edm::Handle<LumiSummary> lumiSummary;
-  edm::Handle<LumiDetails> lumiDetails;
-  bool got_lumiSummary = iEvent.getLuminosityBlock().getByToken(lumiSummaryToken_, lumiSummary);
-  bool got_lumiDetails = iEvent.getLuminosityBlock().getByToken(lumiDetailsToken_, lumiDetails);
-
-  // in case we wanted to analyze a specific lumi block only
-  if ((analyzeLS_ >= 0) && !(luminosityBlock_ == analyzeLS_))
-    return;
 
   instBXLumi_ = -1.;
   avginstBXLumi_ = -1.;
-  // //https://twiki.cern.ch/twiki/bin/view/CMS/LumiCalc
-  if (got_lumiDetails && lumiDetails.isValid()) {
-      instBXLumi_ =
-        lumiDetails->lumiValue(LumiDetails::kOCC1, iEvent.bunchCrossing()) * 6.37;  // cor=6.37 in 2011, 7.13 in 2012?
-    avginstBXLumi_ =
-        lumiDetails->lumiValue(LumiDetails::kOCC1, iEvent.bunchCrossing()) * 6.37;  // cor=6.37 in 2011, 7.13 in 2012?
-    if (eventcounter_ < 5) {
-      cout << "lumidetails valid" << endl;
-      for (int i = 0; i < 3564; ++i) {  // Loop on bunch crossings
-        cout << i << " beam 1 " << lumiDetails->lumiBeam1Intensity(i) << " beam 2 "
-             << lumiDetails->lumiBeam2Intensity(i) << " instbxl " << lumiDetails->lumiValue(LumiDetails::kOCC1, i)
-             << " Hz/ub" << endl;
-      }
-    }
-  }
+  lsglb_ = 0;   // for history plots, a global lumisection number, cumulated across all runs
 
-  if (got_lumiSummary && lumiSummary.isValid()) {
-    // no lumi details, take the average
-    instBXLumi_ = lumiSummary->avgInsDelLumi();     // inv ub
-    avginstBXLumi_ = lumiSummary->avgInsDelLumi();  // inv ub
-    // uncorrected, see Twiki
-    // note 1 inv ub /s = 1e30 cm^-2 s^-1
-    // with 1331 bunches, 2e34 ==> 1.5 inv ub s^-1 bx^-1
-    double avgInsDelLumi = lumiSummary->avgInsDelLumi();
-    int nbx = 600;
-    if (eventcounter_ < 5) {
-      std::cout << "run= " << run_ << " ls = " << luminosityBlock_ << "  avgInsDelLumi=" << avgInsDelLumi
-                << " [Hz/ub]   "
-                << " nbx=" << nbx << "       PU=" << 70e-3 * 88.9e-6 * avgInsDelLumi * 1e6 / nbx << "    intgDelLumi"
-                << lumiSummary->intgDelLumi() << "  version " << lumiSummary->lumiVersion()
-                << "  length=" << lumiSummary->lumiSectionLength() << std::endl;
-    }
-  }
-
-  // <<<<<<<<<<<<<<<<<<<<<<  lumi code snippet from Andrea
-  //float instlumi = -1.;
-  //float perbunchlumi = -1.; // instBXLumi_;
-  // edm::Handle<LumiScalersCollection> lumiScalers;
-  // iEvent.getByToken(lumiScalersToken_, lumiScalers);
-  // if ( lumiScalers.isValid() && lumiScalers->size() ) {
-
-  //   LumiScalersCollection::const_iterator scalit = lumiScalers->begin();
-  //   instLumi_ = scalit->instantLumi();
-  //   instBXLumi_ = scalit->bunchLumi();
-  //   /*
-  //   std::cout<<"<StripMultiplicityAnalyzer::analyze()>: scalit->version(): "
-  //   <<scalit->version()<<"\tscalit->instantOccLumi().size(): "
-  //   <<(scalit->instantOccLumi()).size()<<std::endl;
-  //   for(unsigned int ilk=0; ilk<(scalit->instantOccLumi()).size(); ilk++)
-  //     std::cout<<"<StripMultiplicityAnalyzer::analyze()>: "
-  //     <<(scalit->instantOccLumi())[ilk]<<std::endl;
-  //   */
-  // } else {
-  //cout << " no lumiscaler info " << endl;
-  // }
-  // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> lumi code snippet from Andrea
-
-  // legacy,still used for the global ls
-  instLumi_ = -1.;
-  instBXLumi_ = -1.;
-  lsglb_ = 0;
+  const LumiInfo& lumi = iEvent.get(lumiInfoToken_);
   /*
-  if (run_ > 1) {
-    try {
-      avginstBXLumi_ = lumidata_[run_][luminosityBlock_];  ///ub/Xing
-      instBXLumi_ = avginstBXLumi_;
-      lsglb_ = lsindex_[run_] + luminosityBlock_;
-    } catch (const std::out_of_range& e) {
-      instBXLumi_ = 0;
-      cout << "caught out of range for " << run_ << " " << luminosityBlock_ << endl;
-    }
-  } else {
-    lsglb_ = 0;
-  }
+  std::cout << "Luminosity for " << iEvent.run() << " LS " << iEvent.luminosityBlock() << " is "
+	    << lumi.getTotalInstLumi() << std::endl;
   */
-  
+  avginstBXLumi_ = lumi.getTotalInstLumi();
+  instBXLumi_ = lumi.getInstLumiBX(iEvent.bunchCrossing()); // not yet
+
   lumiPU_ = sigma_pp_ * instBXLumi_;
   avglumiPU_ = sigma_pp_ * avginstBXLumi_;
 }
@@ -6429,6 +6359,10 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   forceDump_ = false;   // use with caution
   lsglb_ = 0;
 
+  // in case we wanted to analyze a specific lumi block only
+  if ((analyzeLS_ >= 0) && !(luminosityBlock_ == analyzeLS_))
+    return;
+  
   // get lumi info, only available for reco!
   get_luminosity_infos(iEvent);
 

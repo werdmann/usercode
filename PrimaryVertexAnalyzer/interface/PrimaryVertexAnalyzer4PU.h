@@ -55,20 +55,21 @@
 #include <SimDataFormats/Track/interface/SimTrack.h>
 #include <SimDataFormats/TrackingHit/interface/PSimHitContainer.h>
 #include "SimGeneral/HepPDTRecord/interface/ParticleDataTable.h"
-//#include "DataFormats/Math/interface/LorentzVector.h"
+
 #include <SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h>
 #include <SimDataFormats/TrackingAnalysis/interface/TrackingVertex.h>
 #include <SimDataFormats/TrackingAnalysis/interface/TrackingVertexContainer.h>
 
-//#include "SimTracker/TrackAssociation/interface/TrackAssociatorBase.h"  // does not exist anymore
 #include "SimDataFormats/Associations/interface/TrackToTrackingParticleAssociator.h"
 
 #include "SimDataFormats/EncodedEventId/interface/EncodedEventId.h"
 
-//#include "RecoLuminosity/LumiProducer/interface/LumiCorrector.h"
-#include "DataFormats/Luminosity/interface/LumiDetails.h"
-#include "DataFormats/Luminosity/interface/LumiSummary.h"
-#include "DataFormats/Scalers/interface/LumiScalers.h"
+
+#include "DataFormats/Luminosity/interface/LumiInfo.h"
+#include "DataFormats/Luminosity/interface/LumiDetails.h"// obsolete??
+#include "DataFormats/Luminosity/interface/LumiSummary.h"// obsolete??
+#include "DataFormats/Scalers/interface/LumiScalers.h"// obsolete??
+
 
 // AOD
 #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
@@ -1218,7 +1219,6 @@ private:
   bool RECO_;
   double instBXLumi_;
   double avginstBXLumi_;
-  double instLumi_;
 
   //const
   const TrackerTopology* tTopo_;
@@ -1262,6 +1262,7 @@ private:
   edm::EDGetTokenT<LumiDetails> lumiDetailsToken_;
   edm::EDGetTokenT<LumiSummary> lumiSummaryToken_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalersToken_;
+  edm::EDGetTokenT<LumiInfo> lumiInfoToken_;
 
   edm::EDGetTokenT<edmNew::DetSetVector<SiPixelCluster> > pixelClusters_;
   bool l1garbled_;
