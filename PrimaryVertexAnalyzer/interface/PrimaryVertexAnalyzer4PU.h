@@ -472,11 +472,15 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       has_timing = false;
       t = 0;
       dt = 1e10;
-      timeQuality = -1.;
+      timeQuality = -1.;  // will stay -1. for no timing info
+      MTD_pathlength = 0;
+      MTD_time = -1.;
+      MTD_timeerror = 1e10;
+      MTD_momentum = 0;
       if (f4D) {
         t = tt->timeExt();
         dt = tt->dtErrorExt();
-        if ((dt > 0) && (dt < 0.3)) {
+        if ((dt > 0) && (dt < 0.5) && (!((t==0) && (std::abs(dt-0.35)<1e-5)))) {
           has_timing = true;
 	  timeQuality = 1.; // temporary, overridden externally for now
         }
@@ -511,6 +515,25 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     bool is_proton(){
       return (matched && (!tpr.isNull()) && (abs(tpr->pdgId()) == 2212));
     }
+    double get_particle_mass(){
+      if (matched &&  (!tpr.isNull())){
+	return tpr->mass();
+      }else{
+	return 0;
+      }
+    }
+    double get_t_pid(double mass =0){ //mass corrected reconstructed time at the beamline
+      if (mass == 0 ){ // use the true mass (if known)
+	mass = get_particle_mass();
+      }
+      if ((mass > 0) && (MTD_pathlength > 0) ){
+	double gammasq= 1. + MTD_momentum * MTD_momentum / (mass * mass);
+	double v = 2.99792458e1 * std::sqrt(1. - 1. / gammasq);  // cm / ns
+	return MTD_time - MTD_pathlength / v;
+      }else{
+	return -100.;
+      }
+    }
     
     unsigned int index;
     unsigned int key;
@@ -522,11 +545,14 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     // convenience
     double z;
     double dz;
+    double pt, eta, phi, ip, dip, theta;
     bool has_timing;
     double t;
     double dt;
+    // the following variables are filled in PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks
     double timeQuality;
-    double pt, eta, phi, ip, dip, theta;
+    double MTD_pathlength, MTD_time, MTD_timeerror, MTD_momentum;
+    double th[3];  // track time for particle hypotheses : 0=pion, 1=kaon, 2=proton
 
     // filled later if available
     unsigned int recv_index;  // deprecated
@@ -640,6 +666,9 @@ public:
   virtual void beginJob();
   virtual void endJob();
 
+  void report_counted(const std::string msg, const int max_count);
+  void report_counted(const std::string msg, const std::string msg2, const int max_count);
+
   void analyzeTracksTP(Tracks& tracks, std::vector<SimEvent>& simEvt);
 
 private:
@@ -678,6 +707,7 @@ private:
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
   bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
+  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
 
   bool select(const reco::Vertex&, const int level = 0);
 
@@ -751,10 +781,19 @@ private:
     delete hist;
   }
 
+  std::string fillmsg(const std::string name, const double value1, const double value2=-12345){
+    std::stringstream s;
+    s << " " << name << " with " << value1;
+    if (value2 != -12345){
+      s<< "," << value2;
+    }
+    return s.str();
+  }
+  
   void Fill(std::map<std::string, TH1*>& h, std::string s, double x) {
-    //    cout << "Fill1 " << s << endl;
     if (h.count(s) == 0) {
-      std::cout << "Trying to fill non-existing 1d Histogram named " << s << " with " << x << std::endl;
+      report_counted("PrimaryVertexAnalyzer4PU::Trying to fill non-existing 1d Histogram",
+		     fillmsg(s, x), 1000);
       return;
     }
     h[s]->Fill(x);
@@ -872,7 +911,6 @@ private:
   void get_particle_data_table(const edm::EventSetup&);
   bool get_beamspot_data(const edm::Event&);
   bool get_reco_and_transient_tracks(const edm::EventSetup&, const edm::Event&, Tracks&);
-  reco::TransientTrack* get_transient_track_obsolete(const reco::TrackBaseRef&);
 
   double muvtx(double z);
 
@@ -1065,7 +1103,6 @@ private:
 
   std::vector<bool> trackClass(const reco::Track&);
 
-  void report_counted(std::string msg, const int max_count);
   
   void set_ndof_globals(std::string & vertexcollection){
     // ndof with and without beam constraint:
@@ -1238,6 +1275,11 @@ private:
   edm::EDGetTokenT<edm::ValueMap<float> > trkTimeResosToken_;
   edm::EDGetTokenT<edm::ValueMap<float> > trkTimeQualityToken_;
   double trkTimeQualityThreshold_;
+  edm::EDGetTokenT<edm::ValueMap<float> > MTD_pathlength_Token_;
+  edm::EDGetTokenT<edm::ValueMap<float> > MTD_time_Token_;
+  edm::EDGetTokenT<edm::ValueMap<float> > MTD_timeerror_Token_ ;
+  edm::EDGetTokenT<edm::ValueMap<float> > MTD_momentum_Token_;
+  
   edm::EDGetTokenT<reco::BeamSpot> recoBeamSpotToken_;
   edm::EDGetTokenT<edm::View<reco::Track> > edmView_recoTrack_Token_;
   edm::EDGetTokenT<edm::SimVertexContainer> edmSimVertexContainerToken_;
