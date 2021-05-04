@@ -706,8 +706,8 @@ private:
   double vertex_maxfrac(const reco::Vertex&);
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
-  bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
-  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double& t, double& tError);
+  bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
+  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
 
   bool select(const reco::Vertex&, const int level = 0);
 
@@ -816,13 +816,16 @@ private:
     (static_cast<TH2F*>(h[s]))->Fill(x, y, w);
   }
 
-  void Fill(std::map<std::string, TH1*>& h, std::string s, double x, bool signal) {
+  void Fill(std::map<std::string, TH1*>& h, std::string s, double x, bool signal, bool fill_all = true) {
     if (h.count(s) == 0) {
       std::cout << "Trying to fill non-existing Histogram named " << s << std::endl;
       return;
     }
 
-    h[s]->Fill(x);
+    if(fill_all){
+      h[s]->Fill(x);
+    }
+    
     if (signal) {
       if (h.count(s + "Signal") == 0) {
         std::cout << "Trying to fill non-existing Histogram named " << s + "Signal" << std::endl;
