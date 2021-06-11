@@ -199,7 +199,7 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
   fill_track_histos_ = iConfig.getUntrackedParameter<bool>("fill_track_histos", false);
   selNdofNoBS_ = iConfig.getUntrackedParameter<double>("selNdof", 4.);
   std::cout << "selNDof_(noBS) = " << selNdofNoBS_ << std::endl;
-  selNdofWithBS_ = iConfig.getUntrackedParameter<double>("selNdofWithBS", 2.);
+  selNdofWithBS_ = iConfig.getUntrackedParameter<double>("selNdofWithBS", 7.);
   std::cout << "selNDofWithBS_ = " << selNdofWithBS_ << std::endl;
   selNdof_ = selNdofNoBS_; // to be changed later according to the collection name
   ndof0trk_ = 0.;
