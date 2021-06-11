@@ -54,7 +54,7 @@ vcollections = ["offlinePrimaryVertices", "offlinePrimaryVerticesWithBS"]
 parameters={  # can be overwritten by arguments of the same name
   "4D": cms.untracked.bool(False),
   "selNdof": cms.untracked.double(4.0),
-  "selNdofWithBS": cms.untracked.double(2.0),
+  "selNdofWithBS": cms.untracked.double(7.0),
 #  "splitmethod":cms.untracked.int32(0),
   "usefit":cms.untracked.bool(False),
   "use_tp":cms.untracked.bool(False),
