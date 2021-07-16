@@ -1,4 +1,3 @@
-
 // -*- C++ -*-
 //
 // Package:    MyPrimaryVertexAnalyzer4PU
@@ -8,15 +7,23 @@
 
  Description: primary vertex analyzer for events with pile-up
 
- Implementation:
-     <Notes on implementation>
 */
 //
 // Original Author:  Wolfram Erdmann
 
-#define NOT_MATCHED 666666
-#define NOT_ASSIGNED 666667
+//#define NOT_MATCHED 666666
+#define NOT_MATCHED_VTX_REC 666665
+#define NOT_MATCHED_VTX_SIM 666667
+#define NOT_MATCHED_TK_SIM 666668 
+#define NOT_ASSIGNED 666669
 #define NO_RECVTX 999999
+#define NO_KEY 999998
+#define NO_INDEX 999997
+#define FROM_TRACKING_TRUTH 999996
+#define FROM_PU_SUMMARY 999995
+#define FROM_WHATEVER 999994
+#define FROM_HEPMC 999993
+#define NOT_FILLED 999992
 
 #define DO_BEAMSPOT_ANALYSIS false
 #define DO_ZVSZ_ANALYSIS false
@@ -83,6 +90,11 @@
 #include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 #include "TrackingTools/Records/interface/TransientTrackRecord.h"
 
+// MINIAOD
+#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
+#include "DataFormats/PatCandidates/interface/PackedGenParticle.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+
 // Pileup
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
 
@@ -96,6 +108,7 @@
 #include <DataFormats/TCDS/interface/TCDSRecord.h>
 
 // Root
+#include <TMath.h>
 #include <TH1.h>
 #include <TH2.h>
 #include <TFile.h>
@@ -107,6 +120,8 @@
 
 #include "RecoVertex/PrimaryVertexProducer/interface/TrackFilterForPVFinding.h"
 
+typedef ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::DefaultCoordinateSystemTag> GenEventVertex;
+
 typedef reco::Vertex::trackRef_iterator trackit_t;
 
 // class declaration
@@ -114,135 +129,207 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
   typedef math::XYZTLorentzVector LorentzVector;
   typedef reco::TrackBase::ParameterVector ParameterVector;
 
-  struct SimPart {
+
+  
+public:
+  class SimPart {
+  public:
+    SimPart(){simpvidx=0;rec=0;};// only for backwards compatibility, eventually get rid of this constructor
+    SimPart(int evt0, int type0, int pdgCode, double x1, double y1, double z1, double t1, double px1, double py1, double pz1, double BfieldT){
+      simpvidx = evt0;
+      type = type0;
+      pdg = pdgCode;
+      xvtx = x1;
+      yvtx = y1;
+      zvtx = z1;
+      tvtx = t1;
+      set_trkpar_c(charge, x1, y1, z1, px1, py1, pz1, BfieldT);
+    };
+    
+    SimPart(int evt0, bool is_prompt, double x0, double y0, double z0, pat::PackedGenParticle & cand, double BfieldT){
+      simpvidx = evt0;
+      if (is_prompt){
+	type = 0;
+      }else{
+	type = 1;
+      }
+      pdg = cand.pdgId();
+      set_charge(pdg);
+      xvtx = x0;
+      yvtx = y0;
+      zvtx = z0;
+      tvtx = 0;
+      set_trkpar_p(charge, xvtx, yvtx, zvtx, cand.pt(), cand.phi(), cand.theta(), BfieldT);
+    };
+
+    
+    void set_charge(int pdgCode){
+      charge = 0;
+      if ((pdgCode == 11) || (pdgCode == 13) || (pdgCode == 15) || (pdgCode == -211) || (pdgCode == -2212) ||
+	  (pdgCode == -321) || (pdgCode == -3222) || (pdgCode == 3112)) {
+	charge = -1;
+      } else if ((pdgCode == -11) || (pdgCode == -13) || (pdgCode == -15) || (pdgCode == 211) || (pdgCode == 2212) ||
+		 (pdgCode == 321) || (pdgCode == 3222) || (pdgCode == -3112)) {
+	charge= 1;
+      }else{
+	std::cout << "SimPart: unknown pdg  " << pdgCode << std::endl;
+	charge = 0;
+      }
+    };
+    
+    
+    void set_trkpar_c(double Q, double x0, double y0,double z0, double px,double py,double pz, double BfieldT){
+      double pt = sqrt(px*px + py*py);
+      double cosphi = px / pt;
+      double sinphi = py / pt;
+      double kappa = -Q * 0.002998 * BfieldT / pt;
+      double D0 = x0 * sinphi - y0 * cosphi - 0.5 * kappa * (x0 * x0 + y0 * y0);
+      double q = sqrt(1. - 2. * kappa * D0);
+      double s0 = (x0 * cosphi + y0 * sinphi) / q;
+      double s1;
+      if (fabs(kappa * s0) > 0.001) {
+	s1 = asin(kappa * s0) / kappa;
+      } else {
+	double ks02 = (kappa * s0) * (kappa * s0);
+	s1 = s0 * (1. + ks02 / 6. + 3. / 40. * ks02 * ks02 + 5. / 112. * pow(ks02, 3));
+      }
+      double ptot = sqrt(px*px + py*py + pz*pz);
+      par[reco::TrackBase::i_qoverp] = Q / ptot;
+      par[reco::TrackBase::i_lambda] = M_PI / 2. - atan2(pt, pz);
+      par[reco::TrackBase::i_phi] = phi - asin(kappa * s0);
+      par[reco::TrackBase::i_dxy] = -2. * D0 / (1. + q);
+      par[reco::TrackBase::i_dsz] = z0 * pt / ptot - s1 * pz / ptot;
+    }
+    
+    void set_trkpar_p(double Q, double x0, double y0,double z0, double pt, double phi, double theta, double BfieldT){
+      double kappa = -Q * 0.002998 * BfieldT / pt;
+      double D0 = x0 * sin(phi) - y0 * cos(phi) - 0.5 * kappa * (x0 * x0 + y0 * y0);
+      double q = sqrt(1. - 2. * kappa * D0);
+      double s0 = (x0 * cos(phi) + y0 * sin(phi)) / q;
+      double s1;
+      if (fabs(kappa * s0) > 0.001) {
+	s1 = asin(kappa * s0) / kappa;
+      } else {
+	double ks02 = (kappa * s0) * (kappa * s0);
+	s1 = s0 * (1. + ks02 / 6. + 3. / 40. * ks02 * ks02 + 5. / 112. * pow(ks02, 3));
+      }
+      double ptot = pt/sin(theta);
+      par[reco::TrackBase::i_qoverp] = Q / ptot;
+      par[reco::TrackBase::i_lambda] = M_PI / 2. - theta;
+      par[reco::TrackBase::i_phi] = phi - asin(kappa * s0);
+      par[reco::TrackBase::i_dxy] = -2. * D0 / (1. + q);
+      par[reco::TrackBase::i_dsz] = z0 * sin(theta) - s1 * cos(theta);
+    }
+
+    /* put this into a separate function, doesn't seem to be used, anyway
+      // now get zpca  (get perigee wrt beam)
+      double x10 = x0 - vertexBeamSpot_.x(z0);
+      double y10 = y0 - vertexBeamSpot_.y(z0);
+      
+      D0 = x10 * sin(p.phi()) - y10 * cos(p.phi()) - 0.5 * kappa * (x10 * x10 + y10 * y10);
+      q = sqrt(1. - 2. * kappa * D0);
+      s0 = (x1 * cos(p.phi()) + y1 * sin(p.phi())) / q;
+      if (fabs(kappa * s0) > 0.001) {
+	s1 = asin(kappa * s0) / kappa;
+      } else {
+	double ks02 = (kappa * s0) * (kappa * s0);
+	s1 = s0 * (1. + ks02 / 6. + 3. / 40. * ks02 * ks02 + 5. / 112. * pow(ks02, 3));
+      }
+      ddcap = -2. * D0 / (1. + q);
+      zdcap = z0 - s1 / tan(p.theta());
+          sp.zvtx = z0;
+          sp.xvtx = x0;
+          sp.yvtx = y0;
+
+          sp.phi = p.phi();
+          sp.eta = p.eta();
+      
+    }
+    */
+    
     ParameterVector par;
     int type;      // 0 = primary
-    double zdcap;  // z@dca' (closest approach to the beam
-    double ddcap;
-    double zvtx;  // z of the production vertex
+    double zvtx;  // z of the production vertex (not necessarily the primary)
     double xvtx;  // x of the production vertex
     double yvtx;  // y of the production vertex
+    double tvtx;  // t of the production vertex (not available for miniaod)
+    double charge;
     int pdg;      // particle pdg id
     int rec;
     int simpvidx;  // index of the primary vertex
+    /* defined but never used */
+    double zdcap;  // z@dca' (closest approach to the beam)
+    double ddcap;
     double ldec;   // distance of the production vertex from the primary vertex
     double eta;    // convenience
     double phi;
   };
 
-  // auxiliary class holding simulated primary vertices
-  class simPrimaryVertex {
-  public:
-    simPrimaryVertex(double x1, double y1, double z1, double t1) : x(x1), y(y1), z(z1), t(t1), ptsq(0), nGenTrk(0) {
-      ptot.setPx(0);
-      ptot.setPy(0);
-      ptot.setPz(0);
-      ptot.setE(0);
-      p4 = LorentzVector(0, 0, 0, 0);
-      type = 0;
-      sumpT = 0;
-      pt_hat = 0;
-      is_visible = false;
-      nTrk = 0;
-      nTrkPrim = 0;
-      nTrkSec = 0;
-    };
-    int type;  // 0=not defined, 1=full,  2 = from PileupSummaryInfo
-    double x, y, z, t;
-    HepMC::FourVector ptot;
-    LorentzVector p4;
-    double ptsq;
-    double sumpT;
-    int nGenTrk;
-    int nTrk, nTrkPrim, nTrkSec;  // charged particles inside acceptance (--> getSimPVs)
-    float pt_hat;
-    bool is_visible;
-
-    //int nMatchedTracks;  --> EXTRAS
-    //int event;
-    EncodedEventId eventId;
-    std::vector<int> finalstateParticles;
-    std::vector<int> simTrackIndex;
-    std::vector<int> matchedRecTrackIndex;
-    std::vector<int> genVertex;
-    std::vector<reco::Track> reconstructedTracks;
-    const reco::Vertex* recVtx;
-
-    // temporary entry, to be removed when "mergedrate" issue is resolved
-    double closest_vertex_distance_z;
-  };
-
-  class RecoTrack;  // forward declaration
-
   
-  // auxiliary class holding simulated events
+
+  // forward declarations
+  class MTrack;
+  class Tracks;
+  
+  // aclass holding simulated events
   class SimEvent {
   public:
     SimEvent(unsigned int idx) {
       index = idx;
       type = 0;
-      nChTP = 0;
+      x = 0;          // simulated vertex position
+      y = 0;
+      z = -99;
+      t = 0;
+      nChTP = 0;     // number of charged particles
       ptvis = 0;
       pxvis = 0;
       pyvis = 0;
-      z = -99;
-      sumpt2rec = 0.;
+      pt_hat = 0;
+      nGenTrk = 0;
+      parts.clear();
       sumpt2 = 0;
       sumpt = 0;
       Tc = -1;
       dzmax = 0;
       dztrim = 0;
       chisq = 0;
-      trkidx.clear();
 
-      nwosmatch = 0;
-      nwntmatch = 0;
-      wnt.clear();  // formerly known as recvnt
-      wos.clear();
+      // track truth-matching
+      trkidx.clear();         // indices of truth-matched tracks
 
-      wos_dominated_recv.clear();    // list of wos dominated rec vertices
-      matchQuality = 0;
+      // MVertex matching
+      clear_matching_info();
 
-      rec = NOT_MATCHED;  // index of a matched rec vertex, if any
-      ndof = 0;           // ndof of the matched rec vertex
-      zrec = 1000.;
     };
 
-    unsigned int index;  // =index in the SimEvent list
-    EncodedEventId eventId;
+    unsigned int index;      // =index in the SimEvent list
+    EncodedEventId eventId;  // 
     int type;
-    // 0=not filled,
-    //1=full (e.g. from TrackingParticles),
-    //2=partially filled (from PileUpSummary)
+    // 0 = not filled,
+    // 1 = full (e.g. from TrackingParticles),
+    // 2 = partially filled (from PileUpSummary)
 
     double x, y, z, t;
     double xfit, yfit, zfit, tfit;
     int nChTP;
     double ptvis, pxvis, pyvis;
+    int nGenTrk;
+    double pt_hat;
+    std::vector<SimPart> parts;           // list of simulated particles that might have tracks
 
     std::vector<const TrackingParticle*> tp;
+    std::vector<edm::RefToBase<reco::Track> > trkref;  // hm, can we get rid of this?
 
-    std::vector<reco::TransientTrack> tk;              // deprecated, use rtk instead
-    std::vector<reco::TransientTrack> tkprim;          // deprecated, use rktprim insted
-    std::vector<reco::TransientTrack> tkprimsel;       // deprecated, use rtkprimsel instead
-    std::vector<edm::RefToBase<reco::Track> > trkref;  // deprecated, don't use at all
-
-    std::vector<RecoTrack> rtk;              // all selected RecoTracks matched to this simevent
-    std::vector<RecoTrack> rtkprim;          // all selected RecoTracks matched to this simevent that come from within 5 microns of the simvertex
-    std::vector<RecoTrack> rtkprimsel;       // all selected RecoTracks matched to this simevent that pass the ip/sigma(ip) < 4 cut (rec wrt beam) ?????
-    std::vector<unsigned int> trkidx;        // list of RecoTrack indices, used anywher?
+    std::vector<MTrack> rtk;              // all selected MTracks matched to this simevent
+    std::vector<MTrack> rtkprim;          // all selected MTracks matched to this simevent that come from within 5 microns of the simvertex
+    std::vector<MTrack> rtkprimsel;       // all selected MTracks matched to this simevent that pass the ip/sigma(ip) < 4 cut (rec wrt beam) ?????
+    std::vector<unsigned int> trkidx;        // list of MTrack indices, used anywher?
     
     double Tc, chisq, dzmax, dztrim, m4m2;  // filled by getSimEvents via "getTc"
     double sumpt2, sumpt;                   // filled by getSimEvents
-    double sumpt2rec;                       // who fills this?
     
-    // rec vertex matching                 // this block should be obsolete
-    int nmatch, nmatch2;
-    double zmatchn, zmatchn2;
-    double pmatchn, pmatchn2;
-    double wmatch;
-    double zmatchw;
-
+    
     unsigned int nwosmatch;  // number of recvertices dominated by this simevt (by wos)
     unsigned int nwntmatch;  // number of recvertices dominated by this simevt  (by nt)
     std::vector<unsigned int> wos_dominated_recv;  // list of dominated recv (by wos, size==nwosmatch)
@@ -253,24 +340,25 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     std::map<unsigned int, double> wnt;     // weighted number of tracks in recvtx (by index)
     std::map<unsigned int, double> wos;     // sum of wos in recvtx (by index) // oops -> this was int before 04-22
     double sumwos;                          // sum of wos in any recvtx
-    double sumwt;                           // sum of weighted tracks
+    double sumwnt;                          // sum of weighted tracks
 
 
-    // index of matched rec vertex or NOT_MATCHED
+    // index of matched rec vertex or NOT_MATCHED_VTX_REC
     unsigned int rec;
     unsigned int matchQuality;
-    double ndof;
     double zrec;
+    double ndof;
 
-    bool matched() const { return (rec != NOT_MATCHED); }
+    bool matched() const { return (rec != NOT_MATCHED_VTX_REC); }
     bool is_signal() const { return (index == 0); }
 
-    void addTrack(unsigned int irecv, double twos, double wt) {
-      sumwt += wt;
+
+    void addTrack(unsigned int irecv, double twos, double twnt) {
+      sumwnt += twnt;
       if (wnt.find(irecv) == wnt.end()) {
-        wnt[irecv] = wt;
+        wnt[irecv] = twnt;
       } else {
-        wnt[irecv] += wt;
+        wnt[irecv] += twnt;
       }
 
       sumwos += twos;
@@ -281,9 +369,19 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       }
     };
 
+
     bool hasRecoTrack(const edm::RefToBase<reco::Track>& t) {
       for (unsigned int i = 0; i < trkref.size(); i++) {
         if (t.key() == trkref[i].key()) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    bool hasTrack(const MTrack * t) {
+      for (unsigned int i = 0; i < rtk.size(); i++) {
+        if (t->key() == rtk[i].key()) {
           return true;
         }
       }
@@ -323,7 +421,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
     unsigned int max_wos_vtx() {
       double maxwos = 0.;
-      unsigned int vtx = NOT_MATCHED;
+      unsigned int vtx = NOT_MATCHED_VTX_REC;
       for (auto it : wos) {
         if (it.second > maxwos) {
           maxwos = it.second;
@@ -335,7 +433,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 
     unsigned int max_nt_vtx() {
       double maxnt = 0.;
-      unsigned int vtx = NOT_MATCHED;
+      unsigned int vtx = NOT_MATCHED_VTX_REC;
       for (auto it : wnt) {
         if (it.second > maxnt) {
           maxnt = it.second;
@@ -345,10 +443,12 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       return vtx;  // this is often, but not necessarily the matched vertex
     }
 
-    bool was_found(double min_ndof = 0.) { return (rec != NOT_MATCHED) && (ndof > min_ndof); }
+    bool was_found(double min_ndof = 0.) { return (rec != NOT_MATCHED_VTX_REC) && (ndof > min_ndof); }
 
     void clear_matching_info(){
-      rec = NOT_MATCHED;
+      rec = NOT_MATCHED_VTX_REC;
+      ndof = 0;           // ndof of the matched rec vertex (deprecated, not always filled)
+      zrec = 1000.;       // ditto
       matchQuality = 0;
 
       wos.clear();
@@ -357,33 +457,180 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       wos_dominated_recv.clear();
 
       wnt.clear();
+      sumwnt = 0.;
       nwntmatch = 0;
     }
     
     bool operator==(const SimEvent& rh) const { return (index == rh.index); }
-  };
 
-  /* helper class holding recvertex -> simvertex matching information */
-  // FIXME  create a RecoVertex class that holds the recvtx, the RSmatch and
-  // auxilary information so we don't need to do the same things over and over
-  class RSmatch {
-  public:
-    RSmatch() {
-      wos.clear();
-      wnt.clear();
-      wosmatch = NOT_MATCHED;
-      wntmatch = NOT_MATCHED;
-      sumwos = 0;
-      sumwnt = 0;
-      maxwos = 0.;
-      maxwnt = 0;
-      maxwosnt = 0;
 
-      matchQuality = 0;
-      sim = NOT_MATCHED;
+    bool is_visible(){
+      if(type == NOT_FILLED){
+	return false;
+      }else if(type == FROM_TRACKING_TRUTH){
+	return nChTP > 1;
+      }else if(type == FROM_PU_SUMMARY){
+	return pt_hat > 0.5;
+      }else if(type == FROM_HEPMC){
+	return nGenTrk > 2;
+      }else if(type == FROM_WHATEVER){
+	return true;
+      }
+      std::cout << "SimEvent.is_visible() : undefined type " << type << " encountered" << std::endl;
+      return false;
     }
 
-    void addTrack(unsigned int iev, double twos, double twt) {
+  };
+  // SimEvent
+
+
+
+
+  class MVertex{
+    // container for a reco::Vertex  + extras
+    // unified access for various formats including miniaod
+  public:
+    void init(){
+      // reco part
+      recvtx = NULL;
+      tracks.clear();
+      weights.clear();
+      _index = NO_INDEX;
+
+      // truth-matching part (formerly know as RSmatch)
+      clear_matching_info();
+    }
+
+    MVertex(const reco::Vertex* v){
+      init();
+      recvtx = v;      
+    };
+
+    MVertex(const reco::Vertex* v, unsigned int idx){
+      init();
+      recvtx = v;      
+      _index = idx;
+    };
+
+    double sumw() const {
+      double s = 0;
+      for(auto tk : tracks){
+	s += trackWeight(tk);
+      }
+      return s;
+    };
+
+    double sumpt() const {
+      double s = 0;
+      for(auto tk : tracks){
+	s += tk->pt();
+      }
+      return s;
+    };
+
+    double sumpt2() const {
+      double s = 0;
+      for(auto tk : tracks){
+	s += pow(tk->pt(), 2);
+      }
+      return s;
+    };
+
+    double ptmax2() const {
+      double ptmax_1 = 0;
+      double ptmax_2 = 0;
+      for(auto tk : tracks){
+	if (tk->pt() > ptmax_1){
+	  ptmax_2 = ptmax_1;
+	  ptmax_1 = tk->pt();
+	}else if (tk->pt() > ptmax_2){
+	  ptmax_2 = tk->pt();
+	}
+      }
+      return ptmax_2;
+    };
+
+    const double sumabspt() const {
+      double aptsum = 0.;
+      //double waptsum = 0.;
+      //double wsum = 0.;
+      for(auto tk : tracks){
+	aptsum += tk->pt();
+	//double w = trackWeight(tk);
+	//wsum += w;
+	//waptsum += tk->pt * w;
+      }
+      return aptsum;
+    }
+
+    int index() const{ return _index;};
+
+    const double c2xy(const reco::BeamSpot & beam) const {
+      double vxx = recvtx->covariance(iX, iX) + pow(beam.BeamWidthX(), 2);
+      double vyy = recvtx->covariance(iY, iY) + pow(beam.BeamWidthY(), 2);
+
+      double vxy = recvtx->covariance(iX, iY);
+      double dx = recvtx->x() - beam.x(recvtx->z());
+      double dy = recvtx->y() - beam.y(recvtx->z());
+      double D = vxx * vyy - vxy * vxy;
+      return pow(dx, 2) * vyy / D + pow(dy, 2) * vxx / D - 2 * dx * dy * vxy / D;
+    };
+    
+    const double pxy(const reco::BeamSpot & beam) const {
+      return TMath::Prob(c2xy(beam), 2);
+    };
+    
+    double r(const reco::BeamSpot & beam) const {
+      double z = recvtx->z();
+      double dx = recvtx->x() - beam.x(z);
+      double dy = recvtx->y() - beam.y(z);
+      return sqrt(dx * dx + dy * dy);
+    };
+    
+    // some pass-through functions to the underlying reco::Vertex for convenience
+    double ndof() const { return recvtx->ndof();};
+    bool isRecoFake() const { return recvtx->isFake();};
+    double x() const { return recvtx->position().x();};
+    double y() const { return recvtx->position().y();};
+    double z() const { return recvtx->position().z();};
+    double t() const { return recvtx->t();};
+    double xError() const { return recvtx->xError();};
+    double yError() const { return recvtx->yError();};
+    double zError() const { return recvtx->zError();};
+    double tError() const { return recvtx->tError();};
+    double chi2() const {return recvtx->chi2();};
+
+    const reco::Vertex & recovertex() const{  // get a reference of the reco::Vertex
+      if(recvtx == NULL){
+	std::cout << "MVertex:recovertex()  invalid reco vertex requested" << std::endl;
+	throw std::runtime_error("MVertex:recovertex()  invalid reco vertex requested");
+      }else{
+	return *recvtx;
+      }
+    }
+
+    void add_track(MTrack *tk, float weight){
+      tracks.push_back(tk);
+      weights[tk->key()] = weight;
+    }
+
+    unsigned int tracksSize() const {return tracks.size();};
+    float trackWeight (MTrack const * tk)const { return weights.at(tk->key());};
+    float trackWeight (MTrack const & tk)const { return weights.at(tk.key());};
+
+    bool has_timing(){return (t() != 0);};// FIXME improve
+
+
+    const reco::Vertex * recvtx;   // pointer to the underlying reco::Vertex
+    unsigned int _index;           // position in the reco::Vertex collection
+
+    std::vector<MTrack *> tracks;    // these are pointers!, be sure the source track list doesn't move 
+    std::map<unsigned int, float> weights;  // assignment weight from fit
+
+
+
+    // truth-matching
+    void add_truthmatched_track(unsigned int iev, double twos, double twt) { // formerly know as addTrack
       sumwnt += twt;
       if (wnt.find(iev) == wnt.end()) {
         wnt[iev] = twt;
@@ -399,21 +646,37 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
       }
     }
 
-    bool is_real() { return (matchQuality > 0) && (matchQuality < 99); }
+    bool is_real() const{ return (matchQuality > 0) && (matchQuality < 99); }
 
-    bool is_fake() { return (matchQuality <= 0) || (matchQuality >= 99); }
+    bool is_fake() const{ return (matchQuality <= 0) || (matchQuality >= 99); }  // not to be confused with isFake (find better names)
 
-    bool is_signal() { return (sim == 0); }
+    bool is_signal() const{ return (sim == 0); }
 
-    int split_from() {
+    int split_from() const{
       if (is_real())
         return -1;
       if ((maxwos > 0) && (maxwos > 0.3 * sumwos))
         return wosmatch;
       return -1;
     }
-    bool other_fake() { return (is_fake() & (split_from() < 0)); }
+    bool other_fake() const{ return (is_fake() & (split_from() < 0)); }
 
+    void clear_matching_info(){
+      sim = NOT_MATCHED_VTX_SIM;
+      wos.clear();
+      wnt.clear();
+      wosmatch = NOT_MATCHED_VTX_SIM;
+      wntmatch =  NOT_MATCHED_VTX_SIM;
+      sumwos = 0;
+      sumwnt = 0;
+      maxwos = 0.;
+      maxwnt = 0;
+      maxwosnt = 0;
+      matchQuality = 0;
+      sigwosfrac = 0.;
+      sigwntfrac = 0.;
+    }
+    
     std::map<unsigned int, double> wos;  // simevent -> wos
     std::map<unsigned int, double> wnt;  // simevent -> weighted number of truth matched tracks
     unsigned int wosmatch;               // index of the simevent providing the largest contribution to wos
@@ -425,195 +688,473 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     int maxwosnt;                        // number of tracks from the simevt with highest wos
     unsigned int sim;                    // best match  (NO_MATCH if not matched)
     unsigned int matchQuality;           // quality flag
+    double sigwosfrac;                   // for simtrack matching : fraction of the signal wos
+    double sigwntfrac;                   // for simtrack matching : fraction of the weighted signal tracks
   };
 
-  
-  /* RecoVertexExtras, container for additional recvertex info
-     
-   */
-  class RecoVertexExtras {
+
+
+  class MVertexCollection{
+    // container for all Vertexs of a collection, 
   public:
-    RecoVertexExtras(unsigned int idx, const reco::Vertex* recvtx) {
-      index = idx;
-      vtx = recvtx;
-      deltaz = 1000.;
+
+    MVertexCollection(){
+      collection_label = "";
+      vtxs.clear();
+    };
+
+    MVertexCollection(const std::string & label, const reco::VertexCollection* recVtxs, Tracks & tracks){
+      collection_label = label;
+      vtxs.clear();
+      if(recVtxs == NULL){
+	std::cout << "invalid collection " << label << std::endl;
+      }else{
+	
+	for(unsigned iv = 0; iv < recVtxs->size(); iv++){
+	  vtxs.push_back(MVertex( &recVtxs->at(iv), iv));
+	}
+
+	// vertex track lists, should also work for miniaod
+	for(unsigned int i = 0; i < tracks.size(); i++){
+	  auto iv = tracks(i).get_recv(collection_label);
+	  if (iv != NO_RECVTX){
+	    assert(iv <= vtxs.size());
+	    //std::cout << " adding track " << i << " to vertex " << iv << "  with weight " <<  tracks[i].get_weight(collection_label) << std::endl;
+	    vtxs[iv].add_track(&tracks[i], tracks(i).get_weight(collection_label)); 
+	  }
+	}
+      }
     }
-    unsigned int index;
-    const reco::Vertex* vtx;
-    double deltaz; // signed distance to the neares selected recvertex (1000 if there is no other)
+
+    std::string label() const{ return collection_label;}
+    MVertex& at(const unsigned int i){ return vtxs.at(i); }
+    MVertex& operator[] (const unsigned int i){ return vtxs.at(i); }
+    const MVertex& operator() (const unsigned int i){ return vtxs.at(i); }const 
+    unsigned int size() const{ return vtxs.size();}
+    std::vector<MVertex>::iterator begin(){return vtxs.begin();}
+    std::vector<MVertex>::iterator end(){return vtxs.end();}
+   
+    std::string collection_label;
+    std::vector<MVertex> vtxs;
   };
+
+  
 
 
   
-  /* RecoTrack is helper class for collecting rectrk related information */
-  class RecoTrack {
+  /* MTrack is a helper class for collecting track related information and provide a common interface for reco::Track and minoad cndidate based tracks */
+  class MTrack {
   public:
-    RecoTrack(unsigned int idx,
-              const reco::Track* rectrk,
-              reco::TransientTrack* transienttrk,
+
+    // fill some default values
+    void init(){
+      _from_collection = false;  
+      _selected = false;
+      _has_transientTrack = true;
+      _lost_inner_hits = 0;
+      _has_validHitInFirstPixelBarrelLayer = false;
+      _has_hitPattern = 0;
+      _has_timing = false;
+      _is_highPurity = false;
+      _algo = reco::TrackBase::TrackAlgorithm::undefAlgorithm;
+      _ptError = 1.;         
+
+      _t = 0;
+      _dt = 1e10;
+      _timeQuality = -1.;  // will stay -1. for no timing info
+      _MTD_pathlength = 0;
+      _MTD_time = -1.;
+      _MTD_timeerror = 1e10;
+      _MTD_momentum = 0;
+
+      _recv.clear();
+      _weight.clear();
+
+      // filled later by getSimEvents
+      _matched = NOT_MATCHED_TK_SIM;
+      _simEvt = NULL;
+      _zsim = 0;
+      _tsim = 0;
+      _is_primary = false;
+    }
+
+
+    // constructor for tracks from a collection
+    MTrack(unsigned int idx,
+              const reco::Track* trk,
+       	      const reco::TransientTrack ttr,  // passed by value, makes a local copy, doesn't it?
               unsigned int trkkey,
               bool f4D) {
-      index = idx;
-      trk = rectrk;
-      tt = transienttrk;
-      key = trkkey;
+      init();
+      _from_collection = true;
+      _index = idx;            // index into the original collection
+      _trk = trk;              // pointer into the collection  (only guaranteed to be valid when _from_collection == true)
+      _transientTrack = ttr;   // transient track
+      _has_transientTrack = true; // don't use the pointer to the track, it may become invalid when the MTrack is moved around (vectors do that)
+      _key = trkkey;           // this really seems to always be the same as the index, is it guaranteed?
+      _has_hitPattern = true; // well, if this is RECO
+      _z = ( _transientTrack.stateAtBeamLine().trackStateAtPCA()).position().z();
+      _dz = trk->dzError();
+      _pt = trk->pt();
+      _eta = trk->eta();
+      _phi = (_transientTrack.stateAtBeamLine().trackStateAtPCA()).momentum().phi();
+      _theta = (_transientTrack.stateAtBeamLine().trackStateAtPCA()).momentum().theta();
+      Measurement1D atIP = _transientTrack.stateAtBeamLine().transverseImpactParameter();  // error contains beamspot
+      _ip = atIP.value();
+      _dip = atIP.error();
+      _ptError = trk->ptError();
+      _charge = trk->charge();
+      _normalizedChi2 = _transientTrack.normalizedChi2();
 
-      z = (tt->stateAtBeamLine().trackStateAtPCA()).position().z();
-      dz = trk->dzError();
-      pt = trk->pt();
-      eta = trk->eta();
-      phi = (tt->stateAtBeamLine().trackStateAtPCA()).momentum().phi();
-      theta = (tt->stateAtBeamLine().trackStateAtPCA()).momentum().theta();
-      Measurement1D atIP = tt->stateAtBeamLine().transverseImpactParameter();  // error contains beamspot
-      ip = atIP.value();
-      dip = atIP.error();
-
-      selected = false;
-      has_timing = false;
-      t = 0;
-      dt = 1e10;
-      timeQuality = -1.;  // will stay -1. for no timing info
-      MTD_pathlength = 0;
-      MTD_time = -1.;
-      MTD_timeerror = 1e10;
-      MTD_momentum = 0;
+      _lost_inner_hits = trk->hitPattern().numberOfLostHits(reco::HitPattern::MISSING_INNER_HITS); 
+      _is_highPurity = trk->quality(reco::TrackBase::highPurity);
+      _has_validHitInFirstPixelBarrelLayer = trk->hitPattern().hasValidHitInPixelLayer(PixelSubdetector::PixelBarrel, 1);
+  
       if (f4D) {
-        t = tt->timeExt();
-        dt = tt->dtErrorExt();
-        if ((dt > 0) && (dt < 0.5) && (!((t==0) && (std::abs(dt-0.35)<1e-5)))) {
-          has_timing = true;
-	  timeQuality = 1.; // temporary, overridden externally for now
+        _t = _transientTrack.timeExt();
+        _dt = _transientTrack.dtErrorExt();
+        if ((_dt > 0) && (_dt < 0.5)){// ?? && (!((_t==0) && (std::abs(_dt) <-0.35)<1e-5)))) {
+          _has_timing = true;
+	  _timeQuality = 1.; // temporary, overridden externally for now in get_reco_and_transient_tracks
+        }
+      }
+    }
+
+
+
+    // constructor for tracks from miniaod packed candidates (miniaod)
+    MTrack(unsigned int idx,
+	   pat::PackedCandidate cand,
+	   unsigned int unique_id,
+	   edm::ESHandle<TransientTrackBuilder> & builder,
+	   const reco::BeamSpot & beamspot,
+	   const std::string & vertexcollection_label,
+	   bool f4D){
+
+      init();
+      _from_collection = false;
+      _index = idx;
+      _key = unique_id;
+      _has_hitPattern = false;
+      _normalizedChi2 = -1;
+      _charge = cand.charge(); // hmm, is the mc truth based?
+      
+      // map to the (reco) primary vertex,
+      // the inverse mapping is created later with the MVertexCollection
+      unsigned int pv = NO_RECVTX;
+      float weight = 0;
+      if (cand.pvAssociationQuality() == pat::PackedCandidate::UsedInFitTight){
+	pv = cand.vertexRef().key();
+	weight = 0.8;  // > 0.5
+      }else if (cand.pvAssociationQuality() == pat::PackedCandidate::UsedInFitLoose){
+	pv = cand.vertexRef().key();
+	weight = 0.1; // < 0.5
+      }
+      _recv[vertexcollection_label] = pv;
+      _weight[vertexcollection_label] = weight;
+
+      
+      // timing
+      if (f4D) {
+        _t = cand.time();
+        _dt = cand.timeError();
+        if ((_dt > 0) && (_dt < 0.5) && (!((_t==0) && (std::abs(_dt-0.35)<1e-5)))) {
+          _has_timing = true;
+	  _timeQuality = 1.; // not available in miniod
         }
       }
 
-      recv_index = NO_RECVTX;  // deprecated
-      recv.clear();
+      // fill mor info, depending or whether or not we have trackDetails
+      // what is trk = cand.bestTrack() ??
+      if(cand.hasTrackDetails()){
+	
+	// we have a pseudo track and a transient track, fill as ususal
+	_pseudoTrack = cand.pseudoTrack();
+	_trk = &_pseudoTrack;  // invalid when copies are made, don't use unless you kow what you are doing
+	_transientTrack = (*builder).build( _pseudoTrack );
+	_transientTrack.setBeamSpot(beamspot);
+	_has_transientTrack = true;
 
-      // filled later by getSimEvents
-      matched = false;
-      simEvt = NULL;
-      zsim = 0;
-      tsim = 0;
-      is_primary = false;
+	_normalizedChi2 = _transientTrack.normalizedChi2();
+	_z = (_transientTrack.stateAtBeamLine().trackStateAtPCA()).position().z();
+	_dz = _trk->dzError();
+	_pt = _trk->pt();
+	_eta = _trk->eta();
+	_phi = (_transientTrack.stateAtBeamLine().trackStateAtPCA()).momentum().phi();
+	_theta = (_transientTrack.stateAtBeamLine().trackStateAtPCA()).momentum().theta();
+	Measurement1D atIP = _transientTrack.stateAtBeamLine().transverseImpactParameter();
+	_ip = atIP.value();
+	_dip = atIP.error();
+	// limited hit info
+	_has_validHitInFirstPixelBarrelLayer = false;
+	if (cand.lostInnerHits() == pat::PackedCandidate::validHitInFirstPixelBarrelLayer){
+	  _has_validHitInFirstPixelBarrelLayer = true;
+	  _lost_inner_hits = 0; //?
+	}else if (cand.lostInnerHits() == pat::PackedCandidate::noLostInnerHits){
+	  _lost_inner_hits = 0;
+	}else if (cand.lostInnerHits() == pat::PackedCandidate::oneLostInnerHit){
+	  _lost_inner_hits =1 ;
+	}else if(cand.lostInnerHits() == pat::PackedCandidate::moreLostInnerHits){
+	  _lost_inner_hits =2 ;
+	}
+	//cand.pixelLayersWithMeasurement();
+	//cand.trackerLayersWithMeasurement();
+	_is_highPurity = cand.trackHighPurity();
+	
+      }else{
+	
+	// candidate without details
+	//
+	//auto pv = cand.vertex(); ??
+	_trk = NULL;
+	_z = cand.vz() + cand.dzAssociatedPV();
+	_pt = cand.pt();
+	_eta = cand.eta();
+	_phi = cand.phi();
+	_theta = cand.theta();
+	//const auto beam = Point(vertexBeamSpot_.x(z), vertexBeamSpot_.y(z), z);
+	//ip = cand.dxy(beam);
+	_ip = 0.;
+	//?? only if we have a covariance matrix?
+	_dz = 100.; //cand.dzError();
+	_dip= 100.; //cand.dxyError(); 
+	_is_highPurity = cand.trackHighPurity();
+	_has_transientTrack = false;
+
+      }
+
     }
 
-    unsigned int get_recv(std::string& vtxcollection) {
-      if (recv.find(vtxcollection) == recv.end()) {
+    
+    // trivial accessor methods
+    double t () const {return _t;};
+    double dt () const {return _dt;};
+    double z () const {return _z;};
+    double dz () const {return _dz;};
+    double pt () const {return _pt;}
+    double eta () const {return _eta;}
+    double phi () const {return _phi;}
+    double ip () const {return _ip;}
+    double dip () const {return _dip;}
+    double theta () const {return _theta;}
+    double normalizedChi2() const{return _normalizedChi2;}
+    double ptError () const {return _ptError;}
+    double charge () const {return _charge;}
+    double timeQuality () const {return _timeQuality;};
+    double MTD_pathlength () const {return _MTD_pathlength;};
+    double MTD_time () const {return _MTD_time;};
+    double MTD_timeerror () const {return _MTD_timeerror;};
+    double MTD_momentum () const {return _MTD_momentum;};
+    reco::TrackBase::TrackAlgorithm algo () const {return _algo;}
+    bool has_track () const { return !(_trk == NULL); }
+    bool has_transienttrack () const { return _has_transientTrack; }
+    const reco::TransientTrack & transientTrack() { return _transientTrack;}
+    const reco::Track & track() const { if (_from_collection){return *_trk;}else{return _pseudoTrack;}};
+    bool has_hitPattern () const {return _has_hitPattern;}
+    bool selected () const {return _selected;}
+    bool has_timing () const {return _has_timing;}
+    bool is_highPurity () const {return _is_highPurity;}
+    bool has_validHitInFirstPixelBarrelLayer () const {return _has_validHitInFirstPixelBarrelLayer;}
+    unsigned int lost_inner_hits () const {return _lost_inner_hits;}
+    unsigned int key () const {return _key;}
+    unsigned int index () const {return _index;}
+    
+
+    // returns the index of the associated MVertex in it's collection
+    unsigned int get_recv(const std::string& vtxcollection) const  {
+      if (_recv.find(vtxcollection) == _recv.end()) {
         return NO_RECVTX;
       } else {
-        return recv[vtxcollection];
+        return _recv.at(vtxcollection);
       }
     }
 
-    bool is_pion(){
-      return (matched && (!tpr.isNull()) && (abs(tpr->pdgId()) == 211));
+     // returns the weight of the associated MVertex in it's collection
+    double get_weight(std::string& vtxcollection) const  {
+      if (_recv.find(vtxcollection) == _recv.end()) {
+	std::cout << "MTrack.getweight failed to find " << vtxcollection << "   in " << _recv.size() << std::endl;
+        return 0.;
+      } else {
+        return _weight.at(vtxcollection);
+      }
+    }
+
+   // the following fields require MC truth
+    bool matched() const {return _matched != NOT_MATCHED_TK_SIM;}
+    bool is_primary () const {return _is_primary;}
+    double zsim () const {return _zsim;}
+    double tsim () const {return _tsim;}
+    double tres () const {return _t - _tsim;}
+    double zres () const {return _z - _zsim;}
+    double tpull () const {return (_t - _tsim) / _dt;}
+    double zpull () const {return (_z - _zsim) / _dz;}
+
+    bool is_pion () const {
+      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 211));
     }
     
-    bool is_kaon(){
-      return (matched && (!tpr.isNull()) && (abs(tpr->pdgId()) == 321));
+    bool is_kaon () const {
+      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 321));
     }
-    bool is_proton(){
-      return (matched && (!tpr.isNull()) && (abs(tpr->pdgId()) == 2212));
+    bool is_proton () const {
+      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 2212));
     }
-    double get_particle_mass(){
-      if (matched &&  (!tpr.isNull())){
-	return tpr->mass();
+    double get_particle_mass () const {
+      if (matched() &&  (!_tpr.isNull())){
+	return _tpr->mass();
       }else{
 	return 0;
       }
     }
-    double get_t_pid(double mass =0){ //mass corrected reconstructed time at the beamline
+    double get_t_pid(double mass = 0) const{ //mass corrected reconstructed time at the beamline
       if (mass == 0 ){ // use the true mass (if known)
 	mass = get_particle_mass();
       }
-      if ((mass > 0) && (MTD_pathlength > 0) ){
-	double gammasq= 1. + MTD_momentum * MTD_momentum / (mass * mass);
+      if ((mass > 0) && (_MTD_pathlength > 0) ){
+	double gammasq= 1. + _MTD_momentum * _MTD_momentum / (mass * mass);
 	double v = 2.99792458e1 * std::sqrt(1. - 1. / gammasq);  // cm / ns
-	return MTD_time - MTD_pathlength / v;
+	return _MTD_time - _MTD_pathlength / v;
       }else{
 	return -100.;
       }
     }
+
+    bool is_looper () const {
+      return false; // FIXME not implemented yet
+    }
+
+    // for z-sorting
+    static bool lessz(const MTrack & tk1, const MTrack & tk2){
+      return tk1._z < tk2._z;
+    }
+
+    reco::HitPattern hitPattern() const{
+      if (_has_hitPattern){
+	return track().hitPattern();
+      }else{
+	std::cout << "non-existing hitPattern requested" << std::endl;
+	//reco::HitPattern dummy = reco::HitPattern();
+	//return dummy;
+	return reco::HitPattern();
+      }
+    }
+      
+    unsigned int lost() const{//hits
+      if (_has_hitPattern){
+	return track().lost();
+      }else{
+	return 0;
+      }
+    }
+
+    bool _from_collection;               // true if the track comes from a reco trackcollection (then _trk points there)
+    unsigned int _index;                 // index in the source collection (if applicable)
+    unsigned int _key;                   // unique identifier  (usually the index)
+  private:
+    const reco::Track* _trk;             // points to the underlying reco::Track (or pseudoTrack), may be NULL, better not access directly
+  public:
+    reco::Track _pseudoTrack;            // used for miniaod only, _trk points to it in that case (and _from_collection is false)
+    reco::TransientTrack _transientTrack;// local copy of the transient track (if it exists)
+    bool _has_transientTrack;            // tells us if the transient track exists
     
-    unsigned int index;
-    unsigned int key;
-    const reco::Track* trk;  // FIXME get rid of this
-    reco::TransientTrack* tt;
-
-    bool selected;  // result of the track filter
+    bool _selected;  // result of the track filter
 
     // convenience
-    double z;
-    double dz;
-    double pt, eta, phi, ip, dip, theta;
-    bool has_timing;
-    double t;
-    double dt;
+    double _z;
+    double _dz;
+    double _pt, _eta, _phi, _ip, _dip, _theta;
+    double _ptError;
+    double _charge;
+    bool _has_timing;
+    double _t;
+    double _dt;
+    double _normalizedChi2;
+    reco::TrackBase::TrackAlgorithm _algo;
+    
     // the following variables are filled in PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks
-    double timeQuality;
-    double MTD_pathlength, MTD_time, MTD_timeerror, MTD_momentum;
+    double _timeQuality;
+    double _MTD_pathlength, _MTD_time, _MTD_timeerror, _MTD_momentum;
     double th[3];  // track time for particle hypotheses : 0=pion, 1=kaon, 2=proton
-
-    // filled later if available
-    unsigned int recv_index;  // deprecated
-    std::map<std::string, unsigned int> recv;
-
+    
+    bool _is_highPurity;
+    // subset of hit info available in miniaod
+    bool _has_hitPattern;
+    unsigned int _lost_inner_hits;
+    bool _has_validHitInFirstPixelBarrelLayer;
+    
+    // filled later if available : track appears int the track list of this reco vertex
+    std::map<std::string, unsigned int> _recv;
+    std::map<std::string, float> _weight;       // vertex.trackWeight(track)
+    
     // MC truth related
-    bool matched;
-    SimEvent* simEvt;
+    unsigned int _matched;  // idx of the matched simEvent or NOT_MATCHED_TK_SIM
+    SimEvent* _simEvt;
     //TrackingParticle * tp;
-    TrackingParticleRef tpr;
+    TrackingParticleRef _tpr;
     // convenience
-    double zsim;
-    double tsim;
-    bool is_primary;
+    double _zsim;
+    double _tsim;
+    bool _is_primary;
   };
 
-  /* collect information on reco tracks in one place
-     basically a vector of RecoTracks with some extra info and pointers
+
+
+      /* collect information on reco tracks in one place
+     basically a vector of MTracks with some extra info and pointers
    */
 
   class Tracks {
   public:
     edm::Handle<edm::View<reco::Track> > trackCollectionH;
-    std::vector<RecoTrack> recotracks;
-    // some pointers
-    std::map<unsigned int, unsigned int> key2idx;  // get the recotrack from a reftobase key
-    // e.g.  i = tracks.key2idx[vt->key()]   for track_it vt
+    std::vector<MTrack> recotracks;
+    std::map<unsigned int, unsigned int> key2idx;  // get the recotrack from a reftobase key?
 
     Tracks() {
-      recotracks.clear();
-      key2idx.clear();
+      clear();
     }
 
-    RecoTrack& operator()(int i) { return recotracks.at(i); }
+    //const MTrack& operator() (const unsigned int i) { return recotracks.at(i); }const 
+    const MTrack& operator() (const unsigned int i) const { return recotracks.at(i); }
+    MTrack& operator[](const unsigned int i) { return recotracks[i]; }
 
     edm::RefToBase<reco::Track> ref(unsigned int i) { return edm::RefToBase(trackCollectionH, i); }
 
-    RecoTrack& from_key(const unsigned int key){
+    // for tracks from a collection : access by the key of the original track
+    MTrack& from_key(const unsigned int key){
       // make the map if needed
       if (key2idx.size() != recotracks.size()) {
+	key2idx.clear();
         for (unsigned int i = 0; i < recotracks.size(); i++) {
-          key2idx[recotracks[i].key] = i;
+          key2idx[recotracks[i].key()] = i;
         }
       }
+      assert(recotracks[key2idx[key]].key() == key);
       return recotracks[key2idx[key]];
     }
 
-    RecoTrack& from_ref(const edm::RefToBase<reco::Track> ref) { return from_key(ref.key()); }
+    MTrack& from_ref(const edm::RefToBase<reco::Track> ref) { return from_key(ref.key()); }
 
     unsigned int simevent_index_from_key(const unsigned int key){
-      RecoTrack& tk = from_key(key);
-      if (tk.matched){
-	return tk.simEvt->index;
+      MTrack& tk = from_key(key);
+      if (tk.matched()){
+	return tk._simEvt->index;
       }else{
-	return NOT_MATCHED;
+	return NOT_MATCHED_TK_SIM;
       }
     }
-    // for convenience behave like a vector of RecoTrack
-    unsigned int size() { return recotracks.size(); }
-    void clear() { recotracks.clear(); }
-    void push_back(RecoTrack t) { recotracks.push_back(t); }
+
+    // for convenience behave like a vector of MTrack
+    unsigned int size() const { return recotracks.size(); }
+    void clear() { 
+      recotracks.clear();
+      key2idx.clear();
+    }
+    void reserve(unsigned int n) { 
+      recotracks.reserve(n);
+    }
+    void push_back(MTrack t) { recotracks.push_back(t); }// careful, does not automatically keep other arrays synchronized
+    std::vector<MTrack>::const_iterator begin() const{return recotracks.begin();}
+    std::vector<MTrack>::const_iterator end()const{return recotracks.end();}
   };
 
 
@@ -624,7 +1165,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     VertexCounter() { n.clear(); }
 
     void count(int key) {
-      if (key == NOT_MATCHED) {
+      if (key == NOT_MATCHED_TK_SIM) {
         unmatched += 1;
       } else {
         matched += 1;
@@ -654,7 +1195,7 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
     std::map<unsigned int, int> n;
   };
 
-public:
+
   explicit PrimaryVertexAnalyzer4PU(const edm::ParameterSet&);
   ~PrimaryVertexAnalyzer4PU();
 
@@ -668,20 +1209,14 @@ public:
 
   void report_counted(const std::string msg, const int max_count);
   void report_counted(const std::string msg, const std::string msg2, const int max_count);
-
+  void dumpEventSummary(std::vector<SimEvent>&, Tracks & );
+  
   void analyzeTracksTP(Tracks& tracks, std::vector<SimEvent>& simEvt);
 
 private:
-  void analyzeTracksTP(edm::Handle<edm::View<reco::Track> > trackCollectionH,
-                       const reco::VertexCollection* recVtxs,
-                       std::vector<SimPart>& tsim,
-                       std::vector<simPrimaryVertex>& simpv,
-                       std::vector<SimEvent>& simEvt);
 
-  void printPVTrksZT(edm::Handle<edm::View<reco::Track> > trackCollectionH,
-                     const reco::VertexCollection* recVtxs,
-                     std::vector<SimPart>& tsim,
-                     std::vector<simPrimaryVertex>& simpv,
+  void printPVTrksZT(Tracks & tracks,
+                     MVertexCollection & recVtxs,
                      std::vector<SimEvent>& simEvt);
 
   void reportEvent(const char*, bool dumpvertex = false);
@@ -689,20 +1224,21 @@ private:
 
   int* supf(std::vector<SimPart>& simtrks, const edm::View<reco::Track>&);
   int* supfv(std::vector<SimPart>& simtrks, const std::vector<reco::Track>&);
+  std::vector<unsigned int> supfT(std::vector<SimPart>& simtrks, const Tracks &);
 
   static bool match(const ParameterVector& a, const ParameterVector& b);
   std::vector<SimPart> getSimTrkParameters(edm::Handle<edm::SimTrackContainer>& simTrks,
                                            edm::Handle<edm::SimVertexContainer>& simVtcs,
                                            double simUnit = 1.0);
   std::vector<SimPart> getSimTrkParameters(const edm::Handle<reco::GenParticleCollection>);
-  void getTc(const std::vector<reco::TransientTrack>&, double&, double&, double&, double&, double&);
-  void getTc(const std::vector<RecoTrack>&, double&, double&, double&, double&, double&);
+  void getTc(const std::vector<MTrack>&, double&, double&, double&, double&, double&);
 
   double vertex_pxy(const reco::Vertex&);
+  double vertex_sumw(const reco::Vertex&);
   double vertex_aptsum(const reco::Vertex&);
   double vertex_r(const reco::Vertex&);
   double vertex_ptmax2(const reco::Vertex&);
-  double vertex_yum(const reco::Vertex&);
+  //double vertex_yum(const reco::Vertex&);
   double vertex_maxfrac(const reco::Vertex&);
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
@@ -710,6 +1246,7 @@ private:
   bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
 
   bool select(const reco::Vertex&, const int level = 0);
+  bool select(const MVertex&, const int level = 0);
 
 
   void addn(std::map<std::string, TH1*>& h, TH1* hist) {
@@ -772,14 +1309,6 @@ private:
     addn(h, hP);
   }
 
-  void addSP_obsolete(std::map<std::string, TH1*>& h, TH1* hist, const std::string& type) {
-    std::string hname(hist->GetName());
-    std::string htitle(hist->GetTitle());
-    TH1* histn = (TH1*)hist->Clone((hname + "_" + type).c_str());
-    histn->SetTitle((htitle + " (" + type + ")").c_str());
-    addSP(h, histn);
-    delete hist;
-  }
 
   std::string fillmsg(const std::string name, const double value1, const double value2=-12345){
     std::stringstream s;
@@ -914,31 +1443,42 @@ private:
   void get_particle_data_table(const edm::EventSetup&);
   bool get_beamspot_data(const edm::Event&);
   bool get_reco_and_transient_tracks(const edm::EventSetup&, const edm::Event&, Tracks&);
+  bool get_miniaod_tracks(const edm::EventSetup&, const edm::Event&, const std::string &, Tracks&);
 
   double muvtx(double z);
 
-  bool matchVertex(const simPrimaryVertex& vsim, const reco::Vertex& vrec);
   bool isResonance(const HepMC::GenParticle* p);
   bool isFinalstateParticle(const HepMC::GenParticle* p);
   bool isCharged(const HepMC::GenParticle* p);
+  
+  void fillVertexHistos(std::map<std::string, TH1*>& h,
+                        const std::string& vtype,
+                        const MVertex & v,
+                        Tracks& tracks,
+                        const int index = -1,
+                        const double deltaz = 0,
+                        const bool verbose = false);
+
   void fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                 const std::string& vtype,
                                 const reco::Vertex* v = NULL,
 				const int index = -1, 
                                 const double deltaz = 0,
                                 const bool verbose = false);
-  void fillVertexHistos(std::map<std::string, TH1*>& h,
+  
+  void fillRecoVertexHistos(std::map<std::string, TH1*>& h,
                         const std::string& vtype,
                         const reco::Vertex* v,
                         Tracks& tracks,
 			const int index = -1,
                         const double deltaz = 0,
                         const bool verbose = false);
+  
+  
   void fillVertexHistosMatched(std::map<std::string, TH1*>& h,
 			       const std::string& vtype,
-			       const reco::Vertex* v,
+			       MVertex & v,
 			       Tracks& tracks,
-			       const RSmatch& rs,
 			       const std::vector<SimEvent>& simEvt,
                                const int index = -1,
 			       const double deltaz = 0,
@@ -946,11 +1486,11 @@ private:
   
   void fillTrackHistos(std::map<std::string, TH1*>& h,
                        const std::string& ttype,
-                       RecoTrack& tk,
+                       MTrack& tk,
                        const reco::Vertex* v = NULL);
   void fillTrackHistosMatched(std::map<std::string, TH1*>& h,
                        const std::string& ttype,
-                       RecoTrack& tk);
+                       MTrack& tk);
  void fillTransientTrackHistos(std::map<std::string, TH1*>& h,
                                 const std::string& ttype,
                                 const reco::TransientTrack* tt,
@@ -963,39 +1503,39 @@ private:
   void dumpHitInfo(const reco::Track& t);
   void printRecTrks(const edm::View<reco::Track>& recTrks);
   void printRecVtxs(const reco::VertexCollection* recVtxs, std::string title = "Reconstructed Vertices");
+  void printRecVtxs(const MVertexCollection& , std::string title = "Reconstructed Vertices");
   void printSimVtxs(const edm::Handle<edm::SimVertexContainer> simVtxs);
   void printSimTrks(const edm::Handle<edm::SimTrackContainer> simVtrks);
   bool getPuInfo(const edm::Event& iEvent, PileupSummaryInfo& puInfo);
-  std::vector<simPrimaryVertex> getSimPVs(const edm::Handle<edm::HepMCProduct> evtMC);
-  std::vector<simPrimaryVertex> getSimPVs(const edm::Handle<reco::GenParticleCollection>);
-  std::vector<simPrimaryVertex> getSimPVs(const edm::Handle<edm::SimVertexContainer> simVtxs,
-                                          const edm::Handle<edm::SimTrackContainer> simTrks);
-  std::vector<simPrimaryVertex> getSimPVs(const edm::Handle<TrackingVertexCollection>);
-  std::vector<simPrimaryVertex> getSimPVs(const edm::Handle<TrackingVertexCollection>,
-                                          std::vector<PrimaryVertexAnalyzer4PU::simPrimaryVertex>&);
+
 
   Int_t getAssociatedRecoTrackIndex(const edm::Handle<reco::TrackCollection>& recTrks, TrackingParticleRef tpr);
-  bool truthMatchedTrack(edm::RefToBase<reco::Track>, TrackingParticleRef&);
-  std::vector<edm::RefToBase<reco::Track> > getTruthMatchedVertexTracks(const reco::Vertex&, double min_weight = 0.5);
+  bool truthMatchedTrack(const edm::RefToBase<reco::Track>, TrackingParticleRef&)const;
+  std::vector<edm::RefToBase<reco::Track> > getTruthMatchedVertexTracks(const reco::Vertex&, double min_weight = 0.5) const;
   void printTruthMatchValues(edm::RefToBase<reco::Track> track);
+
 
   bool get_MC_truth(const edm::Event& iEvent,
                     Tracks& tracks,
                     bool bPuInfo,
                     PileupSummaryInfo& puInfo,
-                    std::vector<SimEvent>& simEvt,
-                    std::vector<simPrimaryVertex>& simpv,
-                    std::vector<SimPart>& tsim);
+                    std::vector<SimEvent>& simEvt);
 
-  void fill_simvtx_histos(std::vector<simPrimaryVertex>& simpv);
+  void fill_simvtx_histos(std::vector<SimEvent>& simEvts);
 
-  std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents(edm::Handle<TrackingParticleCollection>,
+  void getSimEvents_pu(PileupSummaryInfo& puInfo, std::vector<SimEvent>& simEvents);
+
+  std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents_tp(edm::Handle<TrackingParticleCollection>,
                                                                Tracks& tracks);
 
-  std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents_notp(
+  std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents_simtrks(
 								    const edm::Handle<edm::SimTrackContainer> simTrks,
 								    const edm::Handle<edm::SimVertexContainer> simVtxs,
 								    Tracks& tracks);
+
+  std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents_miniaod(
+								       const edm::Event &, 
+								       Tracks&);
 
   void analyzeVertexRecoCPUTime(std::map<std::string, TH1*>& h,
                                 const reco::VertexCollection* recVtxs,
@@ -1004,96 +1544,85 @@ private:
                                            const reco::VertexCollection* recVtxs,
                                            const std::string message = "");
 
-  void analyzeVertexCollectionReco(std::map<std::string, TH1*>& h,
+  void analyzeVertexCollectionReco_obsolete(std::map<std::string, TH1*>& h,
                                    const reco::VertexCollection* recVtxs,
                                    Tracks& tracks,
                                    const std::string message = "");
 
+  void analyzeVertexCollectionReco(std::map<std::string, TH1*>& h,
+                                   MVertexCollection& recVtxs,
+                                   Tracks& tracks,  // do I even need this?
+                                   const std::string message = "");
+
+  void analyzeVertexCollectionSimTracks(std::map<std::string, TH1*>& h,
+					MVertexCollection& vtxs,
+					Tracks& tracks,
+					std::vector<SimEvent>& ,
+					const std::string message = "");
+
   void analyzeVertexCollectionSimPvNoSimTracks(std::map<std::string, TH1*>& h,
-                                               const reco::VertexCollection* recVtxs,
+                                               MVertexCollection& vtxs,
                                                Tracks& tracks,
-                                               std::vector<simPrimaryVertex>& simpv,
+                                               std::vector<SimEvent>& ,
                                                const std::string message = "");
 
-  void analyzeVertexCollectionSimPv(std::map<std::string, TH1*>& h,
-                                    const reco::VertexCollection* recVtxs,
-                                    Tracks& tracks,
-                                    std::vector<simPrimaryVertex>& simpv,
-                                    std::vector<PrimaryVertexAnalyzer4PU::SimPart>& tsim,
-                                    const std::string message = "");
-
-  void analyzeVertexCollectionDQMMC(std::map<std::string, TH1*>& h,
-                                    const reco::VertexCollection* recVtxs,
-                                    std::vector<simPrimaryVertex>& simpv,
-                                    std::vector<SimPart>& tsim,
-                                    const std::string message);
 
   void analyzeVertexMergeRateTP(std::map<std::string, TH1*>& h,
-                                const reco::VertexCollection* recVtxs,
+                                MVertexCollection& recVtxs,
                                 std::vector<SimEvent>& simEvt,
-                                std::vector<RSmatch>& recvmatch,
                                 const std::string message = "");
 
+
   void analyzeVertexCollectionTP(std::map<std::string, TH1*>& h,
-                                 const reco::VertexCollection* recVtxs,
+                                 MVertexCollection& recVtxs,
                                  Tracks& tracks,
                                  std::vector<SimEvent>& simEvt,
-                                 std::vector<RSmatch>& recvmatch,
                                  const std::string message = "");
 
   void analyzeVertexCollectionPtvis(std::map<std::string, TH1*>& h,
-				    const reco::VertexCollection* recVtxs,
+				    MVertexCollection & vtxs,
 				    Tracks& tracks,
 				    std::vector<SimEvent>& simEvt,
-				    std::vector<RSmatch>& recvmatch,
 				    const std::string message = "");
 
-  void analyzeRecVertexComposition(std::map<std::string, TH1*>& h,
-                                   const reco::Vertex& v,
+
+  void analyzeVertexComposition(std::map<std::string, TH1*>& h,
+                                   MVertex & v,
 				   Tracks& tracks,
-                                   RSmatch& rs,
                                    std::vector<SimEvent>& simEvt,
 				   float npu);
+  void signalvtxmatch(MVertexCollection &, std::vector<SimEvent> &);
 
-  std::vector<RSmatch> tpmatch(const reco::VertexCollection* recVtxs,
-                               std::vector<SimEvent>& simEvt,
-                               Tracks& tracks);
+  void tpmatch(MVertexCollection& vtxs,
+	       std::vector<SimEvent>& simEvt,
+	       Tracks& tracks);
   
-  void wos_match(std::vector<RSmatch> & recvmatch,
-                               const reco::VertexCollection* recVtxs,
-                               std::vector<SimEvent>& simEvt,
-                               Tracks& tracks);
+  void wos_match(MVertexCollection& recVtxs,
+		 std::vector<SimEvent>& simEvt,
+		 Tracks& tracks);
 
-  void nwt_match(std::vector<RSmatch> & recvmatch,
-                               const reco::VertexCollection* recVtxs,
-                               std::vector<SimEvent>& simEvt,
-                               Tracks& tracks);
+  std::string formatMatchList(const std::map<unsigned int, double>&, unsigned int nfield, bool sim);
 
-  void ihmatch(const reco::VertexCollection* recVtxs, std::vector<SimEvent>& simEvt, std::vector<RSmatch>& recvmatch);
 
-  std::string formatMatchList(std::map<unsigned int, double>&, unsigned int nfield, bool sim);
-
-  void printMatchingSummary(const reco::VertexCollection* recVtxs,
+  void printMatchingSummary(MVertexCollection& recVtxs,
                             std::vector<SimEvent>& simEvt,
-                            std::vector<RSmatch>& recvmatch,
                             const std::string message);
 
-  void printEventSummary(std::map<std::string, TH1*>& h,
-                         const reco::VertexCollection* recVtxs,
+  void printEventSummary_tp(std::map<std::string, TH1*>& h,
+			    MVertexCollection&,
+			    Tracks& tracks,
+			    std::vector<SimEvent>& simEvt,
+			    const std::string message);
+
+  void printEventSummary_notp(
+                         MVertexCollection & vtxs,
                          Tracks& tracks,
                          std::vector<SimEvent>& simEvt,
-                         std::vector<RSmatch>& recvmatch,
-                         const std::string message);
-
-  void printEventSummary(std::map<std::string, TH1*>& h,
-                         const reco::VertexCollection* recVtxs,
-                         Tracks& tracks,
-                         std::vector<simPrimaryVertex>& simpv,
                          const std::string message);
 
   reco::VertexCollection* vertexFilter(edm::Handle<reco::VertexCollection>, bool filter);
 
-  void compareCollections(std::vector<SimEvent>& simEvt, std::vector<simPrimaryVertex>& simpv);
+  void compareCollections(std::vector<SimEvent>& simEvt);
 
   void history(const edm::Handle<edm::View<reco::Track> >& tracks, const size_t trackindex = 10000);
   std::string particleString(int) const;
@@ -1111,12 +1640,12 @@ private:
     // ndof with and without beam constraint:
     //                                 0    1   2   3   4   5 
     // no BS    ndof = 2 * nt - 3     -3   -1   1   3   5   7
-    // withBS   ndof = 2 * nt - 1     -1    1   3   5   7
+    // withBS   ndof = 2 * nt          0    2   4   6   8  10
     // with an adaptive fitter, replace nt by <w>
     // hence <w> = (ndof - ndof0trk_) / 2.
     if (vertexcollection.find("WithBS") != std::string::npos){
       selNdof_ = selNdofWithBS_;
-      ndof0trk_ = -1.;
+      ndof0trk_ = 0;
     }else{
       selNdof_ = selNdofNoBS_;
       ndof0trk_ = -3.;
@@ -1126,7 +1655,9 @@ private:
   //timers
   std::map<std::string, std::chrono::time_point<std::chrono::steady_clock> > timer_start_;
   std::map<std::string, double> timers_;
-  void inline timer_start(const std:: string label){timer_start_[label] = std::chrono::steady_clock::now();}
+  void inline timer_start(const std:: string label){
+    timer_start_[label] = std::chrono::steady_clock::now();
+  }
   void timer_stop(const std::string & label){
     auto stop = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - timer_start_[label]);
@@ -1214,14 +1745,17 @@ private:
 
   unsigned int minNumberOfRecTrks_;
   int minNumberOfSelTrks_;
+  int matchsummaries_;
 
+
+
+  /* global containers */
   std::vector<std::string> vertexCollectionLabels_;
   std::map<std::string, edm::EDGetTokenT<reco::VertexCollection> > vertexCollectionTokens_;
   std::map<std::string, std::map<std::string, TH1*> > histograms_;
-  std::map<std::string, reco::VertexCollection*> recVtxs_;
-  std::map<std::string, std::vector<RSmatch> > recvmatch_;
-  int nihmatch_;
-  int matchsummaries_;
+
+  std::map<std::string, reco::VertexCollection*> recVtxs_;     // pointers to the reco::Vertex collections
+  std::map<std::string, MVertexCollection > vertexes_;         // MVertices, parallel to recVtxs,  hold track- and mc truth-links if available
 
   std::map<std::string, TH1*> hsimPV;
   std::map<std::string, TH1*> hTrk;
@@ -1232,18 +1766,11 @@ private:
   double reset_period_;
   unsigned int max_LS_;  //
 
-  std::map<unsigned int, TrackingParticleRef> trkidx2tp_;  // reco::track index    --> tracking particle
-  std::map<unsigned int, unsigned int> trkidx2simevt_;
-  std::map<unsigned int, unsigned int> trkkey2simevt_;
-  std::map<unsigned int, unsigned int> trkkey2recvtx_;
-
-  std::map<unsigned int, reco::TransientTrack*> trkkey2ttrk_obsolete;
+  std::map<unsigned int, TrackingParticleRef> trkidx2tp_;  // reco::track index    --> tracking particle  (FIXME, seems to be unused or at least not filled)
 
   reco::BeamSpot vertexBeamSpot_;
   edm::Handle<reco::BeamSpot> recoBeamSpotHandle_;
   edm::ESHandle<TransientTrackBuilder> theB_;
-
-  std::vector<reco::TransientTrack> t_tks_;  // FIXME  --> deprecated
 
   std::map<std::string, std::pair<unsigned int,unsigned int> > counted_messages_;
 
@@ -1257,6 +1784,7 @@ private:
   bool fTrackTime_;
 
   bool RECO_;
+  bool MINIAOD_;
   double instBXLumi_;
   double avginstBXLumi_;
 
@@ -1290,7 +1818,7 @@ private:
   edm::EDGetTokenT<edm::HepMCProduct> edmHepMCProductToken_;
   edm::EDGetTokenT<reco::TrackToTrackingParticleAssociator> recoTrackToTrackingParticleAssociatorToken_;
 
-  const reco::RecoToSimCollection* r2s_;
+  const reco::RecoToSimCollection* tp_r2s_;
   bool tracking_truth_available_;
 
   std::vector<edm::EDGetTokenT<edm::View<reco::Vertex> > > reco_vertex_view_tokens_;  // FIXME used ?
@@ -1308,6 +1836,16 @@ private:
   edm::EDGetTokenT<LumiSummary> lumiSummaryToken_;
   edm::EDGetTokenT<LumiScalersCollection> lumiScalersToken_;
   edm::EDGetTokenT<LumiInfo> lumiInfoToken_;
+
+  //Kyril's names, for miniaod
+  edm::EDGetTokenT<edm::View<pat::PackedCandidate> > theTracksToken_;
+  edm::EDGetTokenT<edm::View<pat::PackedCandidate> > theLostTracksToken_;
+  edm::EDGetTokenT<edm::View<pat::PackedGenParticle> > theGenParticlesToken_;
+  //edm::EDGetTokenT<ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::DefaultCoordinateSystemTag> > theGenParticlesXyz0Token_;
+  edm::EDGetTokenT<GenEventVertex> theGenParticlesXyz0Token_;
+  edm::EDGetTokenT<float> theGenParticlesT0Token_;
+  edm::EDGetTokenT<edm::View<reco::GenParticle> > thePrunedGenParticlesToken_;
+  //edm::EDGetTokenT<edm::GenEventInfoProduct> GenEventInfoProductToken_;
 
   edm::EDGetTokenT<edmNew::DetSetVector<SiPixelCluster> > pixelClusters_;
   bool l1garbled_;
