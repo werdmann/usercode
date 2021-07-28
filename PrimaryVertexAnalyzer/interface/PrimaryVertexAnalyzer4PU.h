@@ -15,6 +15,7 @@
 #define NOT_MATCHED_VTX_REC 666665
 #define NOT_MATCHED_VTX_SIM 666667
 #define NOT_MATCHED_TK_SIM 666668 
+#define NOT_MATCHED_TK_REC 666664 
 #define NOT_ASSIGNED 666669
 #define NO_RECVTX 999999
 #define NO_KEY 999998
@@ -134,8 +135,9 @@ class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
 public:
   class SimPart {
   public:
-    SimPart(){simpvidx=0;rec=0;};// only for backwards compatibility, eventually get rid of this constructor
+    SimPart(){simpvidx=0;rec=NOT_MATCHED_TK_REC;};// only for backwards compatibility, eventually get rid of this constructor
     SimPart(int evt0, int type0, int pdgCode, double x1, double y1, double z1, double t1, double px1, double py1, double pz1, double BfieldT){
+      // x0,y0,z0 should be the production point relative to the beam spot coordinates
       simpvidx = evt0;
       type = type0;
       pdg = pdgCode;
@@ -143,10 +145,13 @@ public:
       yvtx = y1;
       zvtx = z1;
       tvtx = t1;
+      set_charge(pdg);
       set_trkpar_c(charge, x1, y1, z1, px1, py1, pz1, BfieldT);
+      rec = NOT_MATCHED_TK_REC;
     };
     
-    SimPart(int evt0, bool is_prompt, double x0, double y0, double z0, pat::PackedGenParticle & cand, double BfieldT){
+    SimPart(unsigned int evt0, bool is_prompt, double x0, double y0, double z0, const pat::PackedGenParticle & cand, double BfieldT){
+      // x0,y0,z0 is assumed to be the production point  (not the track reference point)
       simpvidx = evt0;
       if (is_prompt){
 	type = 0;
@@ -154,23 +159,30 @@ public:
 	type = 1;
       }
       pdg = cand.pdgId();
-      set_charge(pdg);
       xvtx = x0;
       yvtx = y0;
       zvtx = z0;
       tvtx = 0;
-      set_trkpar_p(charge, xvtx, yvtx, zvtx, cand.pt(), cand.phi(), cand.theta(), BfieldT);
+      set_charge(pdg);
+      if(charge != cand.charge()) {
+	std::cout << "charge mismatch for pdg " << cand.pdgId() <<  " " << charge <<  "<> " << cand.charge() << std::endl;
+      }
+      set_trkpar_p(charge, x0, y0, z0,  cand.pt(), cand.phi(), cand.theta(), BfieldT);
+      pt = cand.pt();
+      phi = cand.phi();
+      eta = cand.eta();
+      rec = NOT_MATCHED_TK_REC;
     };
 
     
     void set_charge(int pdgCode){
       charge = 0;
       if ((pdgCode == 11) || (pdgCode == 13) || (pdgCode == 15) || (pdgCode == -211) || (pdgCode == -2212) ||
-	  (pdgCode == -321) || (pdgCode == -3222) || (pdgCode == 3112)) {
+	  (pdgCode == -321) || (pdgCode == -3222) || (pdgCode == 3312) || (pdgCode == 3112)) {
 	charge = -1;
       } else if ((pdgCode == -11) || (pdgCode == -13) || (pdgCode == -15) || (pdgCode == 211) || (pdgCode == 2212) ||
-		 (pdgCode == 321) || (pdgCode == 3222) || (pdgCode == -3112)) {
-	charge= 1;
+		 (pdgCode == 321) || (pdgCode == 3222) || (pdgCode == -3312) || (pdgCode == -3112)) {
+	charge = 1;
       }else{
 	std::cout << "SimPart: unknown pdg  " << pdgCode << std::endl;
 	charge = 0;
@@ -178,14 +190,16 @@ public:
     };
     
     
-    void set_trkpar_c(double Q, double x0, double y0,double z0, double px,double py,double pz, double BfieldT){
-      double pt = sqrt(px*px + py*py);
+    void set_trkpar_c(double Q, double x1, double y1,double z1, double px,double py,double pz, double BfieldT){
+      pt = sqrt(px*px + py*py);
       double cosphi = px / pt;
       double sinphi = py / pt;
+      double ptot = sqrt(px*px + py*py + pz*pz);
+
       double kappa = -Q * 0.002998 * BfieldT / pt;
-      double D0 = x0 * sinphi - y0 * cosphi - 0.5 * kappa * (x0 * x0 + y0 * y0);
+      double D0 = x1 * sinphi - y1 * cosphi - 0.5 * kappa * (x1 * x1 + y1 * y1);
       double q = sqrt(1. - 2. * kappa * D0);
-      double s0 = (x0 * cosphi + y0 * sinphi) / q;
+      double s0 = (x1 * cosphi + y1 * sinphi) / q;
       double s1;
       if (fabs(kappa * s0) > 0.001) {
 	s1 = asin(kappa * s0) / kappa;
@@ -193,19 +207,34 @@ public:
 	double ks02 = (kappa * s0) * (kappa * s0);
 	s1 = s0 * (1. + ks02 / 6. + 3. / 40. * ks02 * ks02 + 5. / 112. * pow(ks02, 3));
       }
-      double ptot = sqrt(px*px + py*py + pz*pz);
       par[reco::TrackBase::i_qoverp] = Q / ptot;
       par[reco::TrackBase::i_lambda] = M_PI / 2. - atan2(pt, pz);
       par[reco::TrackBase::i_phi] = phi - asin(kappa * s0);
       par[reco::TrackBase::i_dxy] = -2. * D0 / (1. + q);
-      par[reco::TrackBase::i_dsz] = z0 * pt / ptot - s1 * pz / ptot;
+      par[reco::TrackBase::i_dsz] = z1 * pt / ptot - s1 * pz / ptot;
+
+      std::cout << std::endl;
+      std::cout  << " full phi " << phi - asin(kappa * s0) << " linear " << phi << std::endl;
+      std::cout  << " full dxy " << -2. * D0 / (1. + q) << " linear " <<   -(x1 * sinphi - y1 * cosphi) << std::endl;
+      std::cout  << " full dszi " <<  z1 * pt / ptot - s1 * pz / ptot << " linear " <<  z1 * pt / ptot - (x1 * cosphi + y1 * sinphi) * pz / ptot << std::endl;
+      /*
+      // linear approximation
+      par[reco::TrackBase::i_qoverp] = Q / ptot;
+      par[reco::TrackBase::i_lambda] = M_PI / 2. - atan2(pt, pz);
+      par[reco::TrackBase::i_phi] = phi;
+      par[reco::TrackBase::i_dxy] = -(x1 * sinphi - y1 * cosphi);
+      par[reco::TrackBase::i_dsz] = z1 * pt / ptot - (x1 * cosphi + y1 * sinphi) * pz / ptot;
+      */
+
     }
     
-    void set_trkpar_p(double Q, double x0, double y0,double z0, double pt, double phi, double theta, double BfieldT){
-      double kappa = -Q * 0.002998 * BfieldT / pt;
-      double D0 = x0 * sin(phi) - y0 * cos(phi) - 0.5 * kappa * (x0 * x0 + y0 * y0);
+    void set_trkpar_p(double Q, double x1, double y1,double z1, double pt1, double phi1, double theta1, double BfieldT){
+      // assuming that phi1 is given at (x1,y1,z1)
+      // note that the reference point for reco::Track is the point of closest approach to the beam,
+      double kappa = -Q * 0.002998 * BfieldT / pt1;
+      double D0 = x1 * sin(phi1) - y1 * cos(phi1) - 0.5 * kappa * (x1 * x1 + y1 * y1);
       double q = sqrt(1. - 2. * kappa * D0);
-      double s0 = (x0 * cos(phi) + y0 * sin(phi)) / q;
+      double s0 = (x1 * cos(phi1) + y1 * sin(phi1)) / q;
       double s1;
       if (fabs(kappa * s0) > 0.001) {
 	s1 = asin(kappa * s0) / kappa;
@@ -213,12 +242,12 @@ public:
 	double ks02 = (kappa * s0) * (kappa * s0);
 	s1 = s0 * (1. + ks02 / 6. + 3. / 40. * ks02 * ks02 + 5. / 112. * pow(ks02, 3));
       }
-      double ptot = pt/sin(theta);
+      double ptot = pt1 / sin(theta1);
       par[reco::TrackBase::i_qoverp] = Q / ptot;
-      par[reco::TrackBase::i_lambda] = M_PI / 2. - theta;
-      par[reco::TrackBase::i_phi] = phi - asin(kappa * s0);
+      par[reco::TrackBase::i_lambda] = M_PI / 2. - theta1;
+      par[reco::TrackBase::i_phi] = phi1 - asin(kappa * s0);
       par[reco::TrackBase::i_dxy] = -2. * D0 / (1. + q);
-      par[reco::TrackBase::i_dsz] = z0 * sin(theta) - s1 * cos(theta);
+      par[reco::TrackBase::i_dsz] = z1 * sin(theta1) - s1 * cos(theta1);
     }
 
     /* put this into a separate function, doesn't seem to be used, anyway
@@ -255,14 +284,16 @@ public:
     double tvtx;  // t of the production vertex (not available for miniaod)
     double charge;
     int pdg;      // particle pdg id
-    int rec;
-    int simpvidx;  // index of the primary vertex
+    unsigned int rec;       // index of the matched MTrack
+    unsigned int simpvidx;  // index of the primary vertex
     /* defined but never used */
     double zdcap;  // z@dca' (closest approach to the beam)
     double ddcap;
     double ldec;   // distance of the production vertex from the primary vertex
-    double eta;    // convenience
+    // convenience, may or may not be filled
+    double eta;
     double phi;
+    double pt; 
   };
 
   
@@ -470,7 +501,7 @@ public:
       }else if(type == FROM_TRACKING_TRUTH){
 	return nChTP > 1;
       }else if(type == FROM_PU_SUMMARY){
-	return pt_hat > 0.5;
+	return pt_hat > 0.7; // tune to get similary visible vertex counts as with tracking particles, 0.5 is too low, 0.8 is slightly too high
       }else if(type == FROM_HEPMC){
 	return nGenTrk > 2;
       }else if(type == FROM_WHATEVER){
@@ -1222,8 +1253,6 @@ private:
   void reportEvent(const char*, bool dumpvertex = false);
   void reportVertex(const reco::Vertex&, const char*, bool);
 
-  int* supf(std::vector<SimPart>& simtrks, const edm::View<reco::Track>&);
-  int* supfv(std::vector<SimPart>& simtrks, const std::vector<reco::Track>&);
   std::vector<unsigned int> supfT(std::vector<SimPart>& simtrks, const Tracks &);
 
   static bool match(const ParameterVector& a, const ParameterVector& b);
@@ -1243,7 +1272,7 @@ private:
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
   bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
-  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
+  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
 
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
@@ -1455,14 +1484,13 @@ private:
                         const std::string& vtype,
                         const MVertex & v,
                         Tracks& tracks,
-                        const int index = -1,
                         const double deltaz = 0,
                         const bool verbose = false);
 
   void fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                 const std::string& vtype,
                                 const reco::Vertex* v = NULL,
-				const int index = -1, 
+				const unsigned int index = NO_INDEX, 
                                 const double deltaz = 0,
                                 const bool verbose = false);
   
@@ -1470,7 +1498,7 @@ private:
                         const std::string& vtype,
                         const reco::Vertex* v,
                         Tracks& tracks,
-			const int index = -1,
+			const unsigned int index = NO_INDEX,
                         const double deltaz = 0,
                         const bool verbose = false);
   
@@ -1480,7 +1508,6 @@ private:
 			       MVertex & v,
 			       Tracks& tracks,
 			       const std::vector<SimEvent>& simEvt,
-                               const int index = -1,
 			       const double deltaz = 0,
 			       const bool verbose = false);
   

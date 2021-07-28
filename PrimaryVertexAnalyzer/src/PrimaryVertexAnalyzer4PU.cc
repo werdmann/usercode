@@ -353,7 +353,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
 // member functions
 //
 
-std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDirectory * dir) {
+  std::map<std::string, TH1*> PrimaryVertexAnalyzer4PU::bookVertexHistograms(TDirectory * dir) {
   std::map<std::string, TH1*> h;  // will be returned
 
 
@@ -2963,6 +2963,9 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
 
     if(trktime && have_timequality){
       tk._timeQuality = (*trackTimeQualityH)[tt->trackBaseRef()];
+      if( tk._timeQuality < 0.001){
+	tk._has_timing = false;
+      }
     }
     
     if(have_MTD_time){
@@ -3499,6 +3502,7 @@ bool PrimaryVertexAnalyzer4PU::getPuInfo(const Event& iEvent, PileupSummaryInfo&
   return false;
 }
 
+
 std::vector<PrimaryVertexAnalyzer4PU::SimPart> PrimaryVertexAnalyzer4PU::getSimTrkParameters(
     edm::Handle<edm::SimTrackContainer>& simTrks, edm::Handle<edm::SimVertexContainer>& simVtcs, double simUnit) {
   std::vector<SimPart> tsim;
@@ -3533,10 +3537,10 @@ std::vector<PrimaryVertexAnalyzer4PU::SimPart> PrimaryVertexAnalyzer4PU::getSimT
       } else {
         double Q = 0;  //double Q=HepPDT::theTable().getParticleData(pdgCode)->charge();
         if ((pdgCode == 11) || (pdgCode == 13) || (pdgCode == 15) || (pdgCode == -211) || (pdgCode == -2212) ||
-            (pdgCode == -321) || (pdgCode == -3222)) {
+            (pdgCode == -321) || (pdgCode == -3222) || (pdgCode == 3312)) {
           Q = -1;
         } else if ((pdgCode == -11) || (pdgCode == -13) || (pdgCode == -15) || (pdgCode == 211) || (pdgCode == 2212) ||
-                   (pdgCode == 321) || (pdgCode == 3222)) {
+                   (pdgCode == 321) || (pdgCode == 3222) ||(pdgCode == -3312)) {
           Q = 1;
         } else {
           //std::cout << pdgCode << " " <<std::endl;
@@ -3684,163 +3688,6 @@ std::vector<PrimaryVertexAnalyzer4PU::SimPart> PrimaryVertexAnalyzer4PU::getSimT
 
 
 /*************************************************************************************************************/
-int* PrimaryVertexAnalyzer4PU::supf(std::vector<SimPart>& simtrks, const View<Track>& trks) {
-  // track rec to sim matching for hepMC simtrks
-  bool debug_supf = false;
-
-  unsigned int nrec = trks.size();
-  int* rectosim =
-      new int[nrec];  // pointer to associated simtrk, will be returned, caller must delete when no longer used
-  for (unsigned int i0 = 0; i0 < nrec; i0++)
-    rectosim[i0] = -1;
-
-  unsigned int nsim = simtrks.size();
-  if (nsim == 0)
-    return rectosim;
-  for (unsigned int j = 0; j < nsim; j++)
-    simtrks[j].rec = -1;
-
-  // get tracks ordered by volume in z-eta-phi space // other choices det(V), # hits
-  std::vector<std::pair<double, unsigned int>> vol;
-  for (unsigned int i = 0; i < nrec; i++) {
-    auto t = &trks.at(i);
-    vol.push_back(std::make_pair(t->etaError() * t->phiError() * t->dszError(), i));
-  }
-  std::stable_sort(vol.begin(), vol.end(), std::less<std::pair<double, unsigned int>>());
-
-  unsigned int nmatch = 0;
-  double chi2max = 100.;  // to be increased for subsequent passes
-  for (unsigned int pass = 0; pass < 2; pass++) {
-    if (pass > 0)
-      chi2max *= 10;
-    for (unsigned int k = 0; k < nrec; k++) {
-      unsigned int i = vol[k].second;
-      auto t = &trks.at(i);
-      ParameterVector par = t->parameters();
-      reco::TrackBase::CovarianceMatrix S = t->covariance();
-      // don't believe in 99.99% correlations
-      for (unsigned int a = 0; a < 4; a++) {
-        for (unsigned int b = a + 1; b < 5; b++) {
-          S(a, b) *= 0.5;
-        }
-      }
-
-      if (!S.Invert()) {
-        cout << "covariance matrix inversion failed ";
-        break;
-      }
-
-      // try the remaining sim tracks
-      int jmatch = -1;
-      int jnextbest = -1;
-      double cmatch = 1e10;
-      double cnextbest = 1e10;
-
-      for (unsigned int j = 0; j < nsim; j++) {
-        if (simtrks[j].rec >= 0)
-          continue;
-        SimPart s = simtrks[j];
-
-        double d[5];  // the parameter difference
-        for (int k = 0; k < 5; k++) {
-          d[k] = par[k] - s.par[k];
-        }
-
-        // phi wrap-around
-        if (d[2] > M_PI) {
-          d[2] -= M_2_PI;
-        } else if (d[2] < -M_PI) {
-          d[2] += M_2_PI;
-        }
-
-        // matching chi**2
-        double c = 0;
-        for (int k = 0; k < 5; k++) {
-          for (int l = 0; l < 5; l++) {
-            c += d[k] * d[l] * S(k, l);
-          }
-        }
-
-        if (c < 0) {
-          report_counted("supf: non-positive-definite covariance matrix encountered ", 100);
-        }
-
-        if (debug_supf) {
-          double c0 = pow((par[0] - s.par[0]) / t->qoverpError(), 2) * 0.1  //!
-                      + pow((par[1] - s.par[1]) / t->lambdaError(), 2) + pow((par[2] - s.par[2]) / t->phiError(), 2) +
-                      pow((par[3] - s.par[3]) / t->dxyError(), 2) * 0.1;  //!
-          //	+pow((par[4]-s.par[4])/t->dszError(),2)*0.1;
-          //pij[i][j]=exp(-0.5*c0);
-          if ((c0 < 100000000) || (c < 100000000)) {
-            cout << "pass " << pass << endl;
-            cout << setw(3) << i << " rec " << scientific << setw(8) << par << "    " << fixed << setprecision(3)
-                 << t->phi() << " " << t->eta() << endl;
-            cout << setw(3) << j << " sim " << scientific << setw(8) << s.par << "    " << fixed << setprecision(3)
-                 << simtrks[j].phi << " " << simtrks[j].eta << " ---> C=" << scientific << c << endl;
-            cout << "       " << setw(8) << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4]
-                 << " match=" << match(simtrks[j].par, trks.at(i).parameters()) << endl;
-            cout << "       " << setw(8) << (par[0] - s.par[0]) / t->qoverpError() << ","
-                 << (par[1] - s.par[1]) / t->lambdaError() << "," << (par[2] - s.par[2]) / t->phiError() << ","
-                 << (par[3] - s.par[3]) / t->dxyError() << "," << (par[4] - s.par[4]) / t->dszError() << " c0=" << c0
-                 << endl
-                 << endl;
-          }
-        }
-
-        if ((jmatch < 0) || (c < cmatch)) {
-          jnextbest = jmatch;
-          cnextbest = cmatch;
-          jmatch = j;
-          cmatch = c;
-        } else if ((jnextbest < 0) || (c < cnextbest)) {
-          jnextbest = j;
-          cnextbest = c;
-        }
-      }
-
-      if (debug_supf) {
-        cout << setw(3) << i << " rec --> " << jmatch;
-        if (jmatch >= 0) {
-          cout << " cmatch = " << cmatch;
-        }
-        cout << endl << endl << endl;
-      }
-
-      if ((jmatch >= 0) && (cmatch < chi2max)) {
-        nmatch++;
-        rectosim[i] = jmatch;
-        simtrks[jmatch].rec = i;
-      }
-
-    }  // rec trk
-  }    // pass
-
-  if (verbose_) {
-    std::cout << "simtracks (pt>1) without a matching rec track: " << std::endl;
-    int nunmatched = 0;
-    for (unsigned int j = 0; j < nsim; j++) {
-      if (simtrks[j].rec < 0) {
-        nunmatched++;
-        double pt = 1. / simtrks[j].par[0] / tan(simtrks[j].par[1]);
-        if ((fabs(pt)) > 1.) {
-          std::cout << setw(3) << j << setw(8) << simtrks[j].pdg << setw(8) << setprecision(4) << "  ("
-                    << simtrks[j].xvtx << "," << simtrks[j].yvtx << "," << simtrks[j].zvtx << ")"
-                    << " pt= " << pt << " phi=" << simtrks[j].par[2]
-                    << " eta= " << -log(tan(0.5 * (M_PI / 2 - simtrks[j].par[1]))) << std::endl;
-        }
-      }
-    }
-    cout << " total unmatched " << nunmatched << " out of " << nsim << " sim tracks" << endl;
-    cout << " total matched   " << nmatch << " out of " << nrec << " rec tracks" << endl;
-  }
-  return rectosim;  // caller must delete it !!! delete [] rectosim
-}  //supf
-
-/*************************************************************************************************************/
-
-
-
-/*************************************************************************************************************/
 void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimTracks(
 							    std::map<std::string, TH1*>& h,
 							    MVertexCollection& vertexes,
@@ -3973,21 +3820,20 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionSimTracks(
 
 /*************************************************************************************************************/
 vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtrks, const Tracks& trks)
-// track rec to sim matching for simParticles  (e.g. from miniaod candidates)
+// track rec to sim matching for simParts  (e.g. from miniaod candidates)
 /*************************************************************************************************************/
 {
   bool debug_supf = false;
+  unsigned int ndumpcov = 0;
 
   unsigned int nrec = trks.size();
-  vector<unsigned int> rectosim(nrec);
-  for (unsigned int i0 = 0; i0 < nrec; i0++)
-    rectosim[i0] = NOT_MATCHED_TK_SIM;
+  vector<unsigned int> rectosim(nrec, NOT_MATCHED_TK_SIM);
 
   unsigned int nsim = simtrks.size();
   if (nsim == 0)
     return rectosim;
-  for (unsigned int j = 0; j < nsim; j++)
-    simtrks[j].rec = -1;
+  
+  for (unsigned int j = 0; j < nsim; j++){ simtrks[j].rec = NOT_MATCHED_TK_REC; }
 
   // get tracks ordered by volume in z-eta-phi space // other choices det(V), # hits
   std::vector<std::pair<double, unsigned int>> vol;
@@ -3995,45 +3841,70 @@ vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtr
   for (auto tk : trks){
     if(tk.has_track()){
       vol.push_back(std::make_pair(tk.track().etaError() * tk.track().phiError() * tk.track().dszError(), tk.index()));
-      //cout << "supfT:tksel " << nsel << " " << tk.index() << " vol=" << tk.track().etaError()  << "x" <<  tk.track().phiError() << "x" << tk.track().dszError() << endl;
       nsel++;
     }
   }
   std::stable_sort(vol.begin(), vol.end(), std::less<std::pair<double, unsigned int>>());
 
+
   unsigned int nmatch = 0;
-  double chi2max = 100.;  // to be increased for subsequent passes
-  for (unsigned int pass = 0; pass < 2; pass++) {
-    if (pass > 0)
-      chi2max *= 10;
-    for (unsigned int k = 0; k < nsel; k++) {
-      unsigned int i = vol[k].second;
-      const auto & t = trks(i).track();
+  const vector<double>chi2max = {10., 100., 1000.};  // relax for subsequent passes
+  const vector<double> covscale = {0.5, 1.0, 1.0, 0.01, 0.01};  // downweight pt(0), dxy(3), and z(4)
+  for (unsigned int pass = 0; pass < chi2max.size(); pass++) {
+
+    for (const auto & vi : vol){
+
+      unsigned int irec = vi.second;
+      const auto & t = trks(irec).track();
+      if (rectosim[irec] != NOT_MATCHED_TK_SIM) continue; // already matched
+
+      // get track parameters and covariance matrix
       ParameterVector par = t.parameters();
       reco::TrackBase::CovarianceMatrix S = t.covariance();
-      // don't believe in 99.99% correlations ?
-      /*
-      for (unsigned int a = 0; a < 4; a++) {
-        for (unsigned int b = a + 1; b < 5; b++) {
-          S(a, b) *= 0.5;
-        }
+
+      // pseudotracks sometimes come with > 1 correlations, especially at high pt
+      //double t34 = t.covariance(3,4) / sqrt(t.covariance(3,3)*t.covariance(4,4));
+      double t14 = t.covariance(1,4) / sqrt(t.covariance(1,1)*t.covariance(4,4));
+      double t23 =  t.covariance(2,3) / sqrt(t.covariance(2,2)*t.covariance(3,3));
+      string msg2 = Form("track pt= %8.2f ", t.pt());
+      if( std::abs(t23) > 0.95){
+	report_counted("fudged dphi    dxy correlation ", msg2, 10);
+	S(2,3) = t23 / std::abs(t23) * 0.9 * sqrt(t.covariance(2,2)*t.covariance(3,3));
       }
-      */
+      if( std::abs(t14) > 0.95){
+	report_counted("fudged dlambda dz  correlation ",msg2, 10);
+	S(1,4) = t14 / std::abs(t14) * 0.9 * sqrt(t.covariance(1,1)*t.covariance(4,4));
+      }
       
       if (!S.Invert()) {
 	report_counted("covariance matrix inversion failed for track ", 10);
-        break;
+        continue;
       }
 
-      // try the remaining sim tracks
-      int jmatch = -1;
-      int jnextbest = -1;
+      double mindiag = S(0,0);
+      for(unsigned int a=1; a<5; a++){
+	if (S(a,a) < mindiag){ mindiag = S(a,a);}
+      }
+      if(mindiag < 0){
+	report_counted("inverse covariance hase negative diagonal values ", 10);
+	if(debug_supf){
+	  cout << "track.pt = " << t.pt() << endl;
+	  cout << S << endl;
+	  cout << "cov(3,4) = " << t.covariance(3,4) / sqrt(t.covariance(3,3)*t.covariance(4,4)) << endl;
+	  cout << "cov(1,4) = " <<  t.covariance(1,4) / sqrt(t.covariance(1,1)*t.covariance(4,4)) << endl;
+	  cout << "cov(2,3) = " <<  t.covariance(2,3) / sqrt(t.covariance(2,2)*t.covariance(3,3)) << endl;
+	}
+	continue;
+      }
+
+      // try the remaining sim tracks for this rec track
+      unsigned int jmatch = NOT_MATCHED_TK_SIM;
+      unsigned int jnextbest = NOT_MATCHED_TK_SIM;
       double cmatch = 1e10;
       double cnextbest = 1e10;
 
       for (unsigned int j = 0; j < nsim; j++) {
-        if (simtrks[j].rec >= 0)
-          continue;
+        if (simtrks[j].rec != NOT_MATCHED_TK_REC) continue;
         SimPart s = simtrks[j];
 
         double d[5];  // the parameter difference
@@ -4048,65 +3919,89 @@ vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtr
           d[2] += M_2_PI;
         }
 
+	// are we even close in eta-phi?
+	if( (std::abs(d[2]) > 0.2) || (std::abs(d[3])>0.2) ) continue;
+
         // matching chi**2
-        double c = 0;
+        double c = 0, cd = 0;
         for (int k = 0; k < 5; k++) {
+	  cd += d[k] * d[k] / t.covariance()(k, k); // back-up for meaningless inverse
           for (int l = 0; l < 5; l++) {
-            c += d[k] * d[l] * S(k, l);
+            c += d[k] * d[l] * S(k, l) * covscale[k] * covscale[l];
           }
         }
 
         if (c <= 0) {
           report_counted("supfT: non-positive-definite covariance matrix encountered ", 10);
+	  if( ndumpcov++ < 10){
+	    cout << scientific << setw(8) << setprecision(2);
+	    cout << "t.pt() = " << t.pt() << endl;
+	    cout << "c = " << c << endl;
+	    cout << "cd = " << cd << endl;
+	    cout << t.covariance() << endl;
+	    cout << "inverse:" <<endl;
+	    cout << S << endl;
+	  }
+	  c=cd;
         }
 
-        //if ( debug_supf || (c <= 0) ) {
-        if (debug_supf) {
+        if ((debug_supf) && (pass==3)) {
           double c0 =   pow((par[0] - s.par[0]) / t.qoverpError(), 2) * 0.1  //!
                       + pow((par[1] - s.par[1]) / t.lambdaError(), 2)
 	              + pow((par[2] - s.par[2]) / t.phiError(), 2) 
                       + pow((par[3] - s.par[3]) / t.dxyError(), 2) * 0.1;  //!
-          //	+pow((par[4]-s.par[4])/t.dszError(),2)*0.1;
-          //pij[i][j]=exp(-0.5*c0);
-          if ((c0 < 100000000) || (c < 100000000)) {
+	  if ( std::abs((par[1] - s.par[1]) < 0.5)  && std::abs((par[2] - s.par[2]) < 0.5) ){
             cout << "pass " << pass << endl;
-            cout << setw(3) << i << " rec " << scientific << setw(8) << par << "    " << fixed << setprecision(3)
-                 << t.phi() << " " << t.eta() << endl;
-            cout << setw(3) << j << " sim " << scientific << setw(8) << s.par << "    " << fixed << setprecision(3)
-                 << simtrks[j].phi << " " << simtrks[j].eta << " ---> C=" << scientific << c << endl;
-            cout << "       " << setw(8) << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4]
-                 << " match=" << match(simtrks[j].par, trks(i).track().parameters()) << endl;
-            cout << "       " << setw(8) << (par[0] - s.par[0]) / t.qoverpError() << ","
-                 << (par[1] - s.par[1]) / t.lambdaError() << "," << (par[2] - s.par[2]) / t.phiError() << ","
-                 << (par[3] - s.par[3]) / t.dxyError() << "," << (par[4] - s.par[4]) / t.dszError() << " c0=" << c0
+            cout << setw(4) << irec << " rec " << scientific << setw(10) << setprecision(2) << par << "    " 
+                 << fixed << setprecision(3) << setw(8) << t.charge() << " " << t.pt() << " " 
+		 << t.phi() << " " << t.eta() << endl;
+            cout << setw(4) << j << " sim " << scientific << setw(10)  << setprecision(2) << s.par << "    " 
+		 << fixed << setprecision(3) << setw(8) << simtrks[j].charge << " " << simtrks[j].pt 
+		 << " "  << simtrks[j].phi << " " << simtrks[j].eta  << "  pdg=" << simtrks[j].pdg 
+		 <<  " ---> C=" << scientific << c << endl;
+            cout << "       "  << fixed << setw(10) << setprecision(4)
+		 << setw(10) << d[0] << " " << setw(10) << d[1]<< " "  << setw(10) << d[2]<< " "  << setw(10) << d[3] << " " <<  setw(10) << d[4]
+                 << "   match=" << match(simtrks[j].par, trks(irec).track().parameters()) 
+		 << endl;
+            cout << "       " 
+		 << fixed << setw(10) << setprecision(1)
+		 << setw(10) << (par[0] - s.par[0]) / t.qoverpError() << " "
+                 << setw(10) << (par[1] - s.par[1]) / t.lambdaError() << " "
+		 << setw(10) << (par[2] - s.par[2]) / t.phiError() << " "
+                 << setw(10) << (par[3] - s.par[3]) / t.dxyError() << " "
+		 << setw(10) << (par[4] - s.par[4]) / t.dszError()  << " "
+		 << "   c0=" << scientific << c0
                  << endl
                  << endl;
           }
         }
 
-        if ((jmatch < 0) || (c < cmatch)) {
+        if ((jmatch == NOT_MATCHED_TK_SIM) || (c < cmatch)) {
           jnextbest = jmatch;
           cnextbest = cmatch;
           jmatch = j;
           cmatch = c;
-        } else if ((jnextbest < 0) || (c < cnextbest)) {
+        } else if ((jnextbest  == NOT_MATCHED_TK_SIM) || (c < cnextbest)) {
           jnextbest = j;
           cnextbest = c;
         }
       }
 
       if (debug_supf) {
-        cout << setw(3) << i << " rec --> " << jmatch;
-        if (jmatch >= 0) {
-          cout << " cmatch = " << cmatch;
+      cout << setw(4) << irec << " rec --> " << setw(4) << jmatch;
+        if (jmatch != NOT_MATCHED_TK_SIM) {
+	  if(cmatch < chi2max[pass]) { cout <<"**";}else{cout << "  ";}
+          cout << " cmatch = " << fixed << setw(8) << setprecision(1) << cmatch << "  next best= " << cnextbest;
         }
-        cout << endl << endl << endl;
+        cout << endl;// << endl << endl;
       }
 
-      if ((jmatch >= 0) && (cmatch < chi2max)) {
+      if ((jmatch != NOT_MATCHED_TK_SIM) && (cmatch < chi2max[pass])) {
+	// for the last pass with insanely poor chi**2 require at least that nothing else is close
+	if ((pass == chi2max.size()+1 ) && (cmatch > 0.1 * cnextbest)) continue;
         nmatch++;
-        rectosim[i] = jmatch;
-        simtrks[jmatch].rec = i;
+        rectosim[irec] = jmatch;
+        simtrks[jmatch].rec = irec;
       }
 
     }  // rec trk
@@ -4116,7 +4011,7 @@ vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtr
     std::cout << "simtracks (pt>1) without a matching rec track: " << std::endl;
     int nunmatched = 0;
     for (unsigned int j = 0; j < nsim; j++) {
-      if (simtrks[j].rec < 0) {
+      if (simtrks[j].rec == NOT_MATCHED_TK_REC) {
         nunmatched++;
         double pt = 1. / simtrks[j].par[reco::TrackBase::i_qoverp] / tan(simtrks[j].par[1]);
         if ((fabs(pt)) > 1.) {
@@ -4124,7 +4019,6 @@ vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtr
                     << simtrks[j].xvtx << "," << simtrks[j].yvtx << "," << simtrks[j].zvtx << ")"
                     << " pt= " << pt << " phi=" << simtrks[j].par[2]
                     << " eta= " << -log(tan(0.5 * (M_PI / 2 - simtrks[j].par[1]))) << std::endl;
-	  cout << "XX" << simtrks[j].par[0] << endl;
         }
       }
     }
@@ -4137,161 +4031,6 @@ vector<unsigned int> PrimaryVertexAnalyzer4PU::supfT(std::vector<SimPart>& simtr
 /*************************************************************************************************************/
 
 
-
-/*************************************************************************************************************/
-int* PrimaryVertexAnalyzer4PU::supfv(std::vector<SimPart>& simtrks, const vector<Track>& trks) {
-  // track rec to sim matching for hepMC simtrks
-  bool debug_supf = false;
-
-  unsigned int nrec = trks.size();
-  int* rectosim =
-      new int[nrec];  // pointer to associated simtrk, will be returned, caller must delete when no longer used
-  for (unsigned int i0 = 0; i0 < nrec; i0++)
-    rectosim[i0] = -1;
-
-  unsigned int nsim = simtrks.size();
-  if (nsim == 0)
-    return rectosim;
-  for (unsigned int j = 0; j < nsim; j++)
-    simtrks[j].rec = -1;
-
-  // get tracks ordered by volume in z-eta-phi space // other choices det(V), # hits
-  std::vector<std::pair<double, unsigned int>> vol;
-  for (unsigned int i = 0; i < nrec; i++) {
-    auto t = &trks.at(i);
-    vol.push_back(std::make_pair(t->etaError() * t->phiError() * t->dszError(), i));
-  }
-  std::stable_sort(vol.begin(), vol.end(), std::less<std::pair<double, unsigned int>>());
-
-  unsigned int nmatch = 0;
-  double chi2max = 100.;  // to be increased for subsequent passes
-  for (unsigned int pass = 0; pass < 2; pass++) {
-    if (pass > 0)
-      chi2max *= 10;
-    for (unsigned int k = 0; k < nrec; k++) {
-      unsigned int i = vol[k].second;
-      auto t = &trks.at(i);
-      ParameterVector par = t->parameters();
-      reco::TrackBase::CovarianceMatrix S = t->covariance();
-      // don't believe in 99.99% correlations
-      for (unsigned int a = 0; a < 4; a++) {
-        for (unsigned int b = a + 1; b < 5; b++) {
-          S(a, b) *= 0.5;
-        }
-      }
-
-      if (!S.Invert()) {
-        cout << "covariance matrix inversion failed ";
-        break;
-      }
-
-      // try the remaining sim tracks
-      int jmatch = -1;
-      int jnextbest = -1;
-      double cmatch = 1e10;
-      double cnextbest = 1e10;
-
-      for (unsigned int j = 0; j < nsim; j++) {
-        if (simtrks[j].rec >= 0)
-          continue;
-        SimPart s = simtrks[j];
-
-        double d[5];  // the parameter difference
-        for (int k = 0; k < 5; k++) {
-          d[k] = par[k] - s.par[k];
-        }
-
-        // phi wrap-around
-        if (d[2] > M_PI) {
-          d[2] -= M_2_PI;
-        } else if (d[2] < -M_PI) {
-          d[2] += M_2_PI;
-        }
-
-        // matching chi**2
-        double c = 0;
-        for (int k = 0; k < 5; k++) {
-          for (int l = 0; l < 5; l++) {
-            c += d[k] * d[l] * S(k, l);
-          }
-        }
-
-        if (c <= 0) {
-          reportEvent("supf: non-positive-definite covariance matrix encountered ", false);
-        }
-
-        if (debug_supf) {
-          double c0 = pow((par[0] - s.par[0]) / t->qoverpError(), 2) * 0.1  //!
-                      + pow((par[1] - s.par[1]) / t->lambdaError(), 2) + pow((par[2] - s.par[2]) / t->phiError(), 2) +
-                      pow((par[3] - s.par[3]) / t->dxyError(), 2) * 0.1;  //!
-          //	+pow((par[4]-s.par[4])/t->dszError(),2)*0.1;
-          //pij[i][j]=exp(-0.5*c0);
-          if ((c0 < 100000000) || (c < 100000000)) {
-            cout << "pass " << pass << endl;
-            cout << setw(3) << i << " rec " << scientific << setw(8) << par << "    " << fixed << setprecision(3)
-                 << t->phi() << " " << t->eta() << endl;
-            cout << setw(3) << j << " sim " << scientific << setw(8) << s.par << "    " << fixed << setprecision(3)
-                 << simtrks[j].phi << " " << simtrks[j].eta << " ---> C=" << scientific << c << endl;
-            cout << "       " << setw(8) << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4]
-                 << " match=" << match(simtrks[j].par, trks.at(i).parameters()) << endl;
-            cout << "       " << setw(8) << (par[0] - s.par[0]) / t->qoverpError() << ","
-                 << (par[1] - s.par[1]) / t->lambdaError() << "," << (par[2] - s.par[2]) / t->phiError() << ","
-                 << (par[3] - s.par[3]) / t->dxyError() << "," << (par[4] - s.par[4]) / t->dszError() << " c0=" << c0
-                 << endl
-                 << endl;
-          }
-        }
-
-        if ((jmatch < 0) || (c < cmatch)) {
-          jnextbest = jmatch;
-          cnextbest = cmatch;
-          jmatch = j;
-          cmatch = c;
-        } else if ((jnextbest < 0) || (c < cnextbest)) {
-          jnextbest = j;
-          cnextbest = c;
-        }
-      }
-
-      if (debug_supf) {
-        cout << setw(3) << i << " rec --> " << jmatch;
-        if (jmatch >= 0) {
-          cout << " cmatch = " << cmatch;
-        }
-        cout << endl << endl << endl;
-      }
-
-      if ((jmatch >= 0) && (cmatch < chi2max)) {
-        nmatch++;
-        rectosim[i] = jmatch;
-        simtrks[jmatch].rec = i;
-      }
-
-    }  // rec trk
-  }    // pass
-
-  if (verbose_) {
-    std::cout << "simtracks (pt>1) without a matching rec track: " << std::endl;
-    int nunmatched = 0;
-    for (unsigned int j = 0; j < nsim; j++) {
-      if (simtrks[j].rec < 0) {
-        nunmatched++;
-        double pt = 1. / simtrks[j].par[0] / tan(simtrks[j].par[1]);
-        if ((fabs(pt)) > 1.) {
-          std::cout << setw(3) << j << setw(8) << simtrks[j].pdg << setw(8) << setprecision(4) << "  ("
-                    << simtrks[j].xvtx << "," << simtrks[j].yvtx << "," << simtrks[j].zvtx << ")"
-                    << " pt= " << pt << " phi=" << simtrks[j].par[2]
-                    << " eta= " << -log(tan(0.5 * (M_PI / 2 - simtrks[j].par[1]))) << std::endl;
-        }
-      }
-    }
-    cout << " total unmatched " << nunmatched << " out of " << nsim << " sim tracks" << endl;
-    cout << " total matched   " << nmatch << " out of " << nrec << " rec tracks" << endl;
-  }
-  return rectosim;  // caller must delete it !!! delete [] rectosim
-}  //supfv
-
-/*************************************************************************************************************/
 
 
 bool PrimaryVertexAnalyzer4PU::match(const ParameterVector& a, const ParameterVector& b) {
@@ -4427,17 +4166,19 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
   return false;
 }
 
+
 bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v,
-                                                       Tracks& tracks,
-        					   double minquality,
-                                                       double& t,
-                                                       double& tError) {
+							   Tracks& tracks,
+							   double minquality,
+							   double& t,
+							   double& tError, bool verbose) {
   double tsum = 0;
   double wsum = 0;
   double w2sum = 0;
+
   //double a[3] = {0.333333333,0.33333333,0.333333333};
   double a[3] = {0.7,0.2,0.1};
-  constexpr double cooling_factor = sqrt(0.5);
+  constexpr double cooling_factor = 0.5;
   // initial guess
   for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
     if (v.trackWeight(*tk) > 0.5) {
@@ -4451,11 +4192,22 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
       }
     }
   }
+
   
   if (wsum > 0) {
+
+    if(verbose) {
+      cout << "vertex_time_from_tracks_pid  minquality=" << minquality 
+	   << " wsum = " << wsum 
+	   << " tsum = " << tsum 
+	   << " t0 = " << (wsum > 0 ? tsum/wsum : 0)
+	   << " trec = " << v.t();
+      cout << endl;
+    }
+
     double t0 = tsum / wsum;
     int nit = 0;
-    double beta = 1./32.;
+    double beta = 1./256.;
     while ( (nit++) < 100)
       {
 	tsum = 0;
@@ -4496,8 +4248,42 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	  }
 
 	t = tsum / wsum;
-	//cout << " XX " << nit << " T= " << 1/beta << "  t=" << t <<  "    t-t0=" <<  t-t0 << endl;
-	if ((fabs(t - t0) < 1e-4) && (beta >= 1.))
+	if(verbose){
+	  cout << " XX " << nit << " T= " << 1/beta << "  t=" << t <<  "    t-t0=" <<  t-t0 << endl;
+	  // dump the full monty
+	  for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
+	    {
+	      if (v.trackWeight(*tk) > 0.5)
+		{
+		  auto trk = tracks.from_ref(*tk);
+		  if (trk.has_timing() && (trk.timeQuality() >= minquality))
+		  {
+		    double dt = trk.MTD_timeerror();
+		    double e[3] = {0,0,0};
+		    double Z = exp(-beta * 0.5* 3.* 3.);
+		    for(unsigned int j = 0; j < 3; j++){
+		      double tpull =  (trk.th[j] - t0) / dt;
+		      e[j] = exp(- 0.5 * beta * tpull * tpull);
+		      Z += a[j] * e[j];
+		    }
+		    cout << "    " << fixed << setw(7) << setprecision(3) << trk.t() 
+			 << "+/-" << fixed << setw(6) << setprecision(3) << dt;
+		    for(unsigned int j = 0; j < 3; j++){
+		      double wt = a[j] * e[j] / Z;
+		      cout << "  [" <<  fixed << setw(1) << j << "]  " 
+			   << fixed << setw(7) << setprecision(3) << trk.th[j] << "ns  " 
+			   << fixed << setw(7) << setprecision(5) << wt;  
+		    }
+		    if(trk.matched()) {
+		      cout << "   m " << fixed << setw(8) << setprecision(3) << trk.get_t_pid()
+			   << " gen " << fixed << setw(8) << setprecision(3) << trk.tsim();
+		    }
+		    cout << endl;
+		  }
+	      }
+	    }// end of track dump loop
+	}
+	if ((fabs(t - t0) < 1e-4 / sqrt(beta)) && (beta >= 1.))
 	  {
 	    tError = sqrt(w2sum) / wsum;
 	    return true;
@@ -4511,8 +4297,10 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	t0 = t;
 
       }
+    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed to converge", 10);
+  }else{
+    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid has no track timing info", 10);
   }
-  report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed to converge", 10);
   t = 0;
   tError = 1.e10;
   return false;
@@ -4611,13 +4399,14 @@ bool PrimaryVertexAnalyzer4PU::select(const reco::Vertex& v, int level) {
 void PrimaryVertexAnalyzer4PU::fillVertexHistosNoTracks(std::map<std::string, TH1*>& h,
                                                         const std::string& vtype,
                                                         const reco::Vertex* v,
-							const int index,
+							const unsigned int index,
                                                         const double deltaz,
                                                         const bool verbose)
 // fill vertex quantities available from the reco vertex itself
 {
   timer_start("fillVertexHistosNoTracks");
   // delta z = z_this - z_other
+  
   double z = v->z();
   double vxx = v->covariance(iX, iX) + pow(vertexBeamSpot_.BeamWidthX(), 2);
   double vyy = v->covariance(iY, iY) + pow(vertexBeamSpot_.BeamWidthY(), 2);
@@ -4628,7 +4417,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosNoTracks(std::map<std::string, TH
   double D = vxx * vyy - vxy * vxy;
   double c2xy = pow(dx, 2) * vyy / D + pow(dy, 2) * vxx / D - 2 * dx * dy * vxy / D;
 
-  if (index >= 0 ) {
+  if (index != NO_INDEX) {
     Fill(h, vtype + "/index", float(index));
     Fill(h, vtype + "/logndofvsindex", float(index), log(v->ndof()) / log(10.));
     Fill(h, vtype + "/ndofvsindex", float(index), v->ndof());
@@ -4660,7 +4449,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosNoTracks(std::map<std::string, TH
   if (f4D_) {
     // contains vertices that don't actually have timing information
     Fill(h, vtype + "/terrvtx", v->tError());
-    if(v->tError() < 0.1){
+    if((v->tError() < 0.1) && (v->tError() > 0.0)){
       Fill(h, vtype + "/tvtx", v->t());
     }
   }
@@ -4682,7 +4471,7 @@ void PrimaryVertexAnalyzer4PU::fillRecoVertexHistos(std::map<std::string, TH1*>&
                                                 const std::string& vtype,
                                                 const reco::Vertex* v,
                                                 Tracks& tracks,
-						const int index,
+						const unsigned int index,
                                                 const double deltaz,
                                                 const bool verbose) {
   // delta z = z_this - z_other
@@ -4808,14 +4597,13 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistos(std::map<std::string, TH1*>& h,
                                                 const std::string& vtype,
                                                 const MVertex & v,
                                                 Tracks& tracks,
-						const int index,
                                                 const double deltaz,
                                                 const bool verbose)
 /****************************************************************************/
 {
   // delta z = z_this - z_other
   timer_start("fillVertexHistos");
-  fillVertexHistosNoTracks(h, vtype, v.recvtx, index, deltaz, verbose);
+  fillVertexHistosNoTracks(h, vtype, v.recvtx, v.index(), deltaz, verbose);
   Fill(h, vtype + "/ptmax2", v.ptmax2());
   double sumpt2 = v.sumpt2();
   double sumpt = v.sumpt();  // not weighted, unlike sumapt
@@ -4906,7 +4694,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistos(std::map<std::string, TH1*>& h,
     Sxy += w * px * py / pt;
   }
   double Ds = sqrt(pow(Sxx - Syy, 2) + 4 * Sxy);
-  double l1 = (Sxx + Syy + Ds) / (2 * Spt);
+  double l1 = (Sxx + Syy + Ds) / (2 * Spt);x
   double l2 = (Sxx + Syy - Ds) / (2 * Spt);
   double SLT = 2 * l2 / (l1 + l2);
   Fill(h, vtype + "/sphericity", SLT);
@@ -4925,12 +4713,11 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 						       MVertex & v,
 						       Tracks& tracks,
 						       const std::vector<SimEvent>& simEvt,
-						       const int index,
 						       const double deltaz,
 						       const bool verbose)
 /*************************************************************************************/
 {
-  fillVertexHistos(h, vtype, v, tracks, index, deltaz, verbose);
+  fillVertexHistos(h, vtype, v, tracks, deltaz, verbose);
 
 
   // now fill properties wrt the matched simvertex
@@ -4982,9 +4769,14 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       
       double t_fromtracks_pid, tError_fromtracks_pid;
       bool timing_from_tracks_pid = vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0, t_fromtracks_pid, tError_fromtracks_pid);
+      if(!timing_from_tracks_pid) {
+	vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0, t_fromtracks_pid, tError_fromtracks_pid, true);
+      } // FIXME  DEBUGGING only
       
       double t_fromtracks_qual_pid, tError_fromtracks_qual_pid;
       bool timing_from_tracks_qual_pid = vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0.8, t_fromtracks_qual_pid, tError_fromtracks_qual_pid);
+      if(!timing_from_tracks_qual_pid) {vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0.8, t_fromtracks_qual_pid, tError_fromtracks_qual_pid, true);} // FIXME  DEBUGGING only
+
 
       double tsim = simevt.t;
       Fill(h, vtype + "/trecsim", v.t() - tsim, simevt.is_signal());
@@ -5308,11 +5100,6 @@ void PrimaryVertexAnalyzer4PU::fillTrackClusterHistos(std::map<std::string, TH1*
           core = 96 * 4 + 2 * 8 * 28 + 2 * 8 * 44 + ((ladder - 1) * 8 + (zindex - 1)) * 2 + int(roc / 8);
         }
 
-        /*
-	if ((core<0) || (core>2559) || (roc<0) || (roc>15) ){
-	  cout << " bad trafo " << core << " "  << roc << endl;
-	}
-	*/
 
         if (clust.isNonnull()) {
           Fill(h, "cores_live", float(luminosityBlock_), float(core));
@@ -6325,18 +6112,26 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
     cout << "getSimEvents_miniaod  gen.size()="<< gen.size() << endl;
   }
 
-  /*
+
   // the "important" particles
   Handle<edm::View<reco::GenParticle> > prunedGenParticlesHandle;
   iEvent.getByToken(thePrunedGenParticlesToken_, prunedGenParticlesHandle);
   edm::View<reco::GenParticle> pruned = (*prunedGenParticlesHandle.product());
+
+  std::map<const reco::GenParticle *, unsigned int> pm;
   if(verbose_){
     cout << "getSimEvents_miniaod  pruned.size()="<< pruned.size() << endl;
+    /*
     if(pruned.size()>0){
-      cout << pruned[0].vertex() << endl;
+      for(unsigned int p = 0; p < pruned.size(); p++){
+	const reco::GenParticle * pp = &pruned[p];
+	pm[pp] = p;
+	cout << "pruned " << p << " pdgid " << pruned[p].pdgId() << "  vertex = " << pruned[p].vertex() << "  " << &(pruned[p]) << endl;
+      }
     }
+    */
   }
-  */
+
 
   /*
   edm::Handle<GenEventInfoProduct> genEvtInfoH;
@@ -6356,7 +6151,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
 
   e.pt_hat = 0;
   for(size_t it = 0; it < gen.size(); it++){
-    auto cand = gen[it];
+    auto & cand = gen[it];
     e.pt_hat += cand.energy();  // not really
 
     // get the parent vertex (is it the parent's decay or production vertex?)
@@ -6365,10 +6160,11 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
     double vz = e.z;
     bool prompt = cand.isPromptFinalState() || cand.isDirectPromptTauDecayProductFinalState();
     if(prompt){
+      // use the event vertex as the production point
     }
     if((cand.numberOfMothers() > 0) && (!prompt)){
-      auto parent = cand.mother(0); // politically correct
-      //std::cout << parent->pdgId() << " " << parent->vertex() << std::endl;
+      auto parent = cand.mother(0); // politically correct, parent in "pruned"
+      //std::cout << "cand  " <<  cand.pdgId() << "   parent= " <<  cand.mother(0) << "  pdgid=" << parent->pdgId() << " " << parent->vertex() << " this=" << &cand << std::endl;
       if(!((parent->vx() == 0) && (parent->vy()==0) && (parent->vz()==0))){
 	vx = parent->vx();
 	vy = parent->vy();
@@ -6408,7 +6204,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
 	e.pyvis += cand.py();
 	e.ptvis += cand.pt();
 	// we probably can't rely on the production vertex info
-	// that make track parameter matching kind of a gabmle
+	// that makes track parameter matching kind of a gamble
 	auto p = SimPart(0, prompt, vx, vy, vz, cand, fBfield_);
 	e.parts.push_back(p);
       }
@@ -6879,10 +6675,9 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
       timer_start("analyzeVertexCollectionSimPvNoSimTracks");
       analyzeVertexCollectionSimPvNoSimTracks(histos, vertexes, tracks, simEvt, label);
       timer_stop("analyzeVertexCollectionSimPvNoSimTracks");
-
-
       
       if(tracking_truth_available_){
+	
 	timer_start("tp-matching");
 	tpmatch(vertexes, simEvt, tracks);    // fill the rec-to-sim matching matrix (vertex.wos[simevent])
 	wos_match(vertexes, simEvt, tracks);  // make a one-to-one assignment
@@ -6899,6 +6694,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
 	timer_stop("analyzeVertexCollectionTP");
 
 	analyzeVertexCollectionPtvis(histos, vertexes, tracks, simEvt,label);
+	
       } else {
 	
 	timer_start("analyzeVertexCollectionSimTracks");
@@ -7208,7 +7004,8 @@ void PrimaryVertexAnalyzer4PU::printEventSummary_notp(MVertexCollection& vtxs,
     } else if (((idxrec < vtxs.size()) && (idxsim < simEvt.size()) && (zrecv[idxrec].first < zsimv[idxsim].first)) ||
                ((idxrec < vtxs.size()) && (idxsim == simEvt.size()))) {
       // rec only on this line
-      cout << "                                 ";                                         // no sim
+      cout << "                         ";                                                // no sim
+      if(f4D_) cout << "        ";                                                         // no sim
       cout << setw(8) << setprecision(4) << fixed << zrecv[idxrec].first << tag;           // rec z
       if(f4D_) {cout << "," << setw(7) << setprecision(4) << fixed << trec;}               // rec t
       if(show_matching){
@@ -7217,7 +7014,7 @@ void PrimaryVertexAnalyzer4PU::printEventSummary_notp(MVertexCollection& vtxs,
       }
       cout << " (ndof=" << fixed << setw(6) << setprecision(1) << ndof;                    // more
       //cout << ", p=" << setw(6) << setprecision(4) << pxy;
-      cout << ", p="  << fixed << setw(6) << setprecision(1) << sumpt;
+      cout << ",PT="  << fixed << setw(6) << setprecision(1) << sumpt;
       cout << ", ptmax2=" << setw(4) << setprecision(1) << ptmax2 << ")";
       cout << "   fake " << endl;
       idxrec++;
@@ -7230,13 +7027,13 @@ void PrimaryVertexAnalyzer4PU::printEventSummary_notp(MVertexCollection& vtxs,
       cout << setw(6) << setprecision(1) << fixed << simEvt[zsimv[idxsim].second].pt_hat;                // sim pt_hat
       cout << "          ";
       cout << "          ";
-      if(f4D_) {cout << "       ";}
+      if(f4D_) {cout << "        ";}
       if (simEvt[zsimv[idxsim].second].is_visible()) {
 	if(show_matching) cout << "      ";
         if (zsimv[idxsim].second == 0) {
-          cout << "                                        lost signal vertex" << endl;
+          cout << "                                       lost signal vertex" << endl;
         } else {
-          cout << "                                        lost PU  ";
+          cout << "                                       lost PU  ";
           if (simEvt[zsimv[idxsim].second].is_visible()) {
             cout << "(" << setw(3) << simEvt[zsimv[idxsim].second].nGenTrk << ")";
             //   << "(" << setw(5) << setprecision(3) << simEvt[zsimv[idxsim].second].pt_hat << ")"
@@ -7253,9 +7050,6 @@ void PrimaryVertexAnalyzer4PU::printEventSummary_notp(MVertexCollection& vtxs,
     }
   }
   std::cout << std::endl;
-  double sumwntfrac = 0;// FIXME just a test
-  for(const auto & v : vtxs ){ sumwntfrac += v.sigwntfrac;}
-  cout << " sum sigwntfrac = " << sumwntfrac << endl;
 }//printEventSummary_notp
 /***************************************************************************************/
 
@@ -8331,7 +8125,6 @@ void PrimaryVertexAnalyzer4PU::signalvtxmatch(MVertexCollection & vertexes, std:
       sumsigwntfrac += v.sigwntfrac; 
     }
   }
-  cout << "tpmatch  sumsigwntfrac = " << sumsigwntfrac << endl;
 
 }//tpmatch
 /*******************************************************************************************************************************/
@@ -8917,19 +8710,22 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
   Fill(h, "sigwntfracmax", sigwntfracmax);
   
   for(auto & v : vtxs){
-    if(v.sigwosfrac > 0) Fill(h, "sigwosfracvsdzsignal", v.z() - simEvt.at(0).z, v.sigwosfrac );
-    if(v.sigwntfrac > 0) Fill(h, "sigwntfracvsdzsignal", v.z() - simEvt.at(0).z, v.sigwntfrac );
+    if(select(v)){
+      if(v.sigwosfrac > 0) Fill(h, "sigwosfracvsdzsignal", v.z() - simEvt.at(0).z, v.sigwosfrac );
+      if(v.sigwntfrac > 0) Fill(h, "sigwntfracvsdzsignal", v.z() - simEvt.at(0).z, v.sigwntfrac );
+    }
   }
 
   // how many rec vertics have a wos value above some threshold
   const unsigned int nbin = 20;// number of bins in nrecwithsigwos_tp
   vector<unsigned int> nvc(nbin, 0.);
   for(const auto & v : vtxs){
-    if (v.sigwosfrac == 0) continue;
-    // count and cumulate
-    unsigned int bin = v.sigwosfrac * nbin;
-    if (bin > nbin){ bin = nbin;} // if sigwosfrac is == 1.0
-    for(unsigned int b = 0; b < bin; b++){ nvc[b]++; }
+    if (select(v) && (v.sigwosfrac > 0)){
+      // count and cumulate
+      unsigned int bin = v.sigwosfrac * nbin;
+      if (bin > nbin){ bin = nbin;} // if sigwosfrac is == 1.0
+      for(unsigned int b = 0; b < bin; b++){ nvc[b]++; }
+    }
   }
   // then fill
   for(unsigned int b=0; b<nbin; b++){
@@ -8967,9 +8763,9 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       }
       if (vtxs[iv].is_real()) {
         ntprealsel++;
-	fillVertexHistosMatched(h, "matchedvtxsel",  vtxs.at(iv), tracks, simEvt, iv, deltaz);
+	fillVertexHistosMatched(h, "matchedvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
 	if(vtxs[iv].is_signal()){
-	  fillVertexHistosMatched(h, "matchedsignalvtxsel",  vtxs.at(iv), tracks, simEvt, iv, deltaz);
+	  fillVertexHistosMatched(h, "matchedsignalvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
 	  for( auto tv : vtxs(iv).tracks){
 	    if (tv->dz() < 0.01) {
 	      fillTrackHistos(h, "matchedsignalvtxseldriver", *tv, vtxs(iv).recvtx);
@@ -8987,7 +8783,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 	    reportEvent(Form("signal vertex selected at index [%d]    %s", iv,comment.c_str()), false);
 	  }
 	}else{
-	  fillVertexHistosMatched(h, "matchedpuvtxsel",  vtxs.at(iv), tracks, simEvt, iv, deltaz);
+	  fillVertexHistosMatched(h, "matchedpuvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
 	  if(iv == 0){
 	    reportEvent(Form("PU vertex selected at index [0]"), false);
 	  }
@@ -8996,12 +8792,12 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 
       if (vtxs[iv].split_from() >= 0) {
         ntpsplitsel++;
-	fillVertexHistos(h, "splitvtxsel",  vtxs.at(iv), tracks, iv, deltaz);
+	fillVertexHistos(h, "splitvtxsel",  vtxs.at(iv), tracks, deltaz);
       }
 
       if (vtxs[iv].split_from() == 0) {
         ntpsplitselfromsignal++;
-	fillVertexHistos(h, "splitvtxselfromsignal",  vtxs.at(iv), tracks, iv, deltaz);
+	fillVertexHistos(h, "splitvtxselfromsignal",  vtxs.at(iv), tracks, deltaz);
 	reportEvent(Form("split signal vertex selected at index [%d]", iv), false);
 
 	for (auto tv : vtxs(iv).tracks){
@@ -9013,11 +8809,11 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       }
       if (vtxs[iv].split_from() > 0) {
         ntpsplitselfrompu++;
-	fillVertexHistos(h, "splitvtxselfrompu",  vtxs(iv), tracks, iv, deltaz);
+	fillVertexHistos(h, "splitvtxselfrompu",  vtxs(iv), tracks, deltaz);
       }
       if (vtxs[iv].other_fake()) {
         ntpotherfakesel++;
-	fillVertexHistos(h, "otherfakevtxsel",  vtxs(iv), tracks, iv, deltaz);
+	fillVertexHistos(h, "otherfakevtxsel",  vtxs(iv), tracks, deltaz);
       }
     }
 
@@ -9055,7 +8851,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
     }
 
     if (vtxs(iv).is_real()) {
-      fillVertexHistosMatched(h, "matchedvtx", vtxs.at(iv), tracks, simEvt, iv);
+      fillVertexHistosMatched(h, "matchedvtx", vtxs.at(iv), tracks, simEvt);
     }
 
     if (vtxs[iv].is_fake()) {
@@ -9995,7 +9791,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco_obsolete(std::map<std
       fillTrackHistos(h, "trkall", tk, &(*recVtxs->begin()));
       //fillTrackClusterHistos(h, "trkall", *t, &(*recVtxs->begin()));
     } else {
-      cout << "filling trkall " << tk.pt() << endl;
       fillTrackHistos(h, "trkall", tk);
       //fillTrackClusterHistos(h, "trkall", *t);
     }
@@ -10326,7 +10121,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
     if ((vtxs.size() > 0) &&  (vtxs[0].recvtx != NULL) && (vtxs[0].recvtx->isValid())) {
       fillTrackHistos(h, "trkall", tk, vtxs[0].recvtx);
     } else {
-      cout << "filling trkall " << tk.pt() << endl;
       fillTrackHistos(h, "trkall", tk);
     }
 
@@ -10749,8 +10543,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionRecoNoTracks(std::map<std:
     if ((v->isFake()) || (v->ndof() < -1))
       continue;
 
-    //fillVertexHistosNoTracks(h, "rec", &(*v), nv-1); // FIXME
-
     if (v->ndof() > 4) {
       Fill(h, "ndofvsz4", v->position().z(), v->ndof());
 
@@ -10759,7 +10551,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionRecoNoTracks(std::map<std:
         Fill(h, "vtxndofzgt1vsLS", lsglb_, v->ndof());
       }
       if (v == recVtxs->begin()) {
-        //fillVertexHistosNoTracks(h, "tagged", &(*v), nv-1); FIXME avoid calling twice
         Fill(h, "vtxndf_tagged", v->ndof());
       }
     }
