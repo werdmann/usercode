@@ -41,8 +41,6 @@
 // TrackingParticle
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticleFwd.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingVertexContainer.h"
-//associator
-#include "SimTracker/Records/interface/TrackAssociatorRecord.h"
 
 // fit
 #include "RecoVertex/KalmanVertexFit/interface/KalmanVertexFitter.h"
