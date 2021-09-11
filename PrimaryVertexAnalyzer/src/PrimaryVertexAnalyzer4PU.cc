@@ -242,11 +242,11 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
   reco_vertex_collections_ = iConfig.getParameter<std::vector<edm::InputTag>>("vertexRecoCollections");
 
   for (auto const& l : reco_vertex_collections_) {
-    std::cout << "vertex collection " << l.label() << std::endl;
-    vertexCollectionLabels_.push_back(l.label());
+    std::cout << "vertex collection " << l.encode() << std::endl;
+    vertexCollectionLabels_.push_back(l.encode());
 
     auto token = edm::EDGetTokenT<reco::VertexCollection>(consumes<reco::VertexCollection>(edm::InputTag(l)));
-    vertexCollectionTokens_[l.label()] = token;
+    vertexCollectionTokens_[l.encode()] = token;
     reco_vertex_view_tokens_.push_back(edm::EDGetTokenT<edm::View<reco::Vertex>>(consumes<edm::View<reco::Vertex>>(l)));
   }
 
