@@ -96,6 +96,7 @@
 #include <fstream>
 
 #include <assert.h>
+#include <algorithm>
 
 
 #include<chrono>
@@ -242,11 +243,13 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
   reco_vertex_collections_ = iConfig.getParameter<std::vector<edm::InputTag>>("vertexRecoCollections");
 
   for (auto const& l : reco_vertex_collections_) {
-    std::cout << "vertex collection " << l.encode() << std::endl;
-    vertexCollectionLabels_.push_back(l.encode());
+    auto l_encode = l.encode();
+    std::replace(l_encode.begin(), l_encode.end(), ':', '_');
+    std::cout << "vertex collection " << l_encode << std::endl;
+    vertexCollectionLabels_.push_back(l_encode);
 
     auto token = edm::EDGetTokenT<reco::VertexCollection>(consumes<reco::VertexCollection>(edm::InputTag(l)));
-    vertexCollectionTokens_[l.encode()] = token;
+    vertexCollectionTokens_[l_encode] = token;
     reco_vertex_view_tokens_.push_back(edm::EDGetTokenT<edm::View<reco::Vertex>>(consumes<edm::View<reco::Vertex>>(l)));
   }
 
@@ -1802,9 +1805,18 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addnSP(h, new TH1F("zrecsimpull","(zrec - zsim)/error", 100, -10, 10));
     addnSP(h, new TH1F("xrecsimpull","(xrec - xsim)/error", 100, -10, 10));
     addnSP(h, new TH1F("yrecsimpull","(yrec - ysim)/error", 100, -10, 10));
+    addnSP(h, new TH1F("nbsimtksinvtx", "simulated tracks in vertex", 200, -0.5, 199.5));
+    addnSP(h, new TH1F("xsim", "simulated x", 100, -0.1, 0.1));
+    addnSP(h, new TH1F("ysim", "simulated y", 100, -0.1, 0.1));
+    addnSP(h, new TH1F("zsim", "simulated z", 120, -30., 30.));
+    addnSP(h, new TH1F("dzminsim", "simulated min(dz)", 120, 0., 12.));
+    addnSP(h, new TH1F("logpthatsim", "simulated log(pt-hat)", 120, 0., 10.));
+    addnSP(h, new TH1F("logsumptsim", "simulated log(sum-pt)", 120, 0., 10.));
+    addnSP(h, new TH1F("logsumpt2sim", "simulated log(sum-pt2)", 120, 0., 12.));
 
-    if (f4D_){
+    if (f4D_) {
       // for matched vertices with timing
+      addnSP(h, new TH1F("tsim", "simulated t", 400, -2., 2.));
       addnSP(h, new TH1F("ntimingvtx", "#timing tracks", 200, 0., 200.));
       addnSP(h, new TH1F("ntimingqual05vtx", "#timing tracks above quality threshold 0.5", 200, 0., 200.));
       addnSP(h, new TH1F("ntimingqual08vtx", "#timing tracks above quality threshold 0.8", 200, 0., 200.));
@@ -1845,9 +1857,6 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     dir->cd();
   }// vtypes
 
-
-
-  
   //  histograms of track quality for fillTrackHistos and fillVertexHistos
   //  note that track histograms are automatically also created and filled for all vtypes !
   vector<string> ttypes = {"trkall",
@@ -2733,27 +2742,28 @@ void PrimaryVertexAnalyzer4PU::bookSimPVHistograms(const char * directory_name)
 {
   TDirectory* dir = rootFile_->mkdir(directory_name);
   dir->cd();
-  add(hsimPV, new TH1F("xsim", "simulated x", 100, -0.1, 0.1));
-  add(hsimPV, new TH1F("ysim", "simulated y", 100, -0.1, 0.1));
-  add(hsimPV, new TH1F("zsim", "simulated z", 120, -30., 30.));
-  add(hsimPV, new TH1F("xsimb", "simulated x", 100, -0.01, 0.01));  // 0.01cm = 100 um
-  add(hsimPV, new TH1F("ysimb", "simulated y", 100, -0.01, 0.01));
-  add(hsimPV, new TH1F("zsimb", "simulated z", 120, -30., 30.));
-  if (f4D_) {
-    add(hsimPV, new TH1F("tsim", "simulated t", 400, -2., 2.));
-  }
+  addSP(hsimPV, new TH1F("xsim", "simulated x", 100, -0.1, 0.1));
+  addSP(hsimPV, new TH1F("ysim", "simulated y", 100, -0.1, 0.1));
+  addSP(hsimPV, new TH1F("zsim", "simulated z", 120, -30., 30.));
+  addSP(hsimPV, new TH1F("dzminsim", "simulated min(dz)", 120, 0., 12.));
+  addSP(hsimPV, new TH1F("xsimb", "simulated x", 100, -0.01, 0.01));  // 0.01cm = 100 um
+  addSP(hsimPV, new TH1F("ysimb", "simulated y", 100, -0.01, 0.01));
+  addSP(hsimPV, new TH1F("zsimb", "simulated z", 120, -30., 30.));
+  if (f4D_) addSP(hsimPV, new TH1F("tsim", "simulated t", 400, -2., 2.));
 
-  add(hsimPV, new TH1F("xbeam", "beamspot x", 100, -1., 1.));
-  add(hsimPV, new TH1F("ybeam", "beamspot y", 100, -1., 1.));
-  add(hsimPV, new TH1F("zbeam", "beamspot z", 100, -5., 5));
-  add(hsimPV, new TH1F("wxbeam", "beamspot sigma x", 100, 0., 0.02));
-  add(hsimPV, new TH1F("wybeam", "beamspot sigma y", 100, 0., 0.02));
-  add(hsimPV, new TH1F("sigmaZbeam", "beamspot sigma z", 100, 0., 10.));
-  const int nsimmax = 250;
-  add(hsimPV, new TH1F("nsimvtx", "# of simulated vertices", nsimmax, 0., float(nsimmax)));
-  add(hsimPV, new TH1F("nbsimtksinvtx", "simulated tracks in vertex", 200, -0.5, 199.5));
+  addSP(hsimPV, new TH1F("xbeam", "beamspot x", 100, -1., 1.));
+  addSP(hsimPV, new TH1F("ybeam", "beamspot y", 100, -1., 1.));
+  addSP(hsimPV, new TH1F("zbeam", "beamspot z", 100, -5., 5));
+  addSP(hsimPV, new TH1F("wxbeam", "beamspot sigma x", 100, 0., 0.02));
+  addSP(hsimPV, new TH1F("wybeam", "beamspot sigma y", 100, 0., 0.02));
+  addSP(hsimPV, new TH1F("sigmaZbeam", "beamspot sigma z", 100, 0., 10.));
+  addSP(hsimPV, new TH1F("nsimvtx", "# of simulated vertices", 250, 0., 250.));
+  addSP(hsimPV, new TH1F("nbsimtksinvtx", "simulated tracks in vertex", 200, -0.5, 199.5));
+
+  addSP(hsimPV, new TH1F("logpthatsim", "simulated log(pt-hat)", 120, 0., 10.));
+  addSP(hsimPV, new TH1F("logsumptsim", "simulated log(sum-pt)", 120, 0., 10.));
+  addSP(hsimPV, new TH1F("logsumpt2sim", "simulated log(sum-pt2)", 120, 0., 12.));
 }
-
 
 void PrimaryVertexAnalyzer4PU::bookEventHistograms(const char * directory_name)
 {
@@ -3078,7 +3088,6 @@ void PrimaryVertexAnalyzer4PU::getSimEvents_pu(PileupSummaryInfo& puInfo, std::v
       e.y = vertexBeamSpot_.y(e.z);
       e.t = t;
 
-
       e.type = FROM_PU_SUMMARY;  // partial
       e.pt_hat = puInfo.getPU_pT_hats()[i];
 
@@ -3206,35 +3215,30 @@ void PrimaryVertexAnalyzer4PU::fill_simvtx_histos(std::vector<SimEvent>& simEvts
 // booked in bookSimPVHistograms, get their own subdirectory "simpvs"
 // called by analyze, information filled by various getSimEvt
 {
-  hsimPV["nsimvtx"]->Fill(simEvts.size());
-  for (auto e : simEvts){
-    if (e.type == FROM_TRACKING_TRUTH) {
-      hsimPV["nbsimtksinvtx"]->Fill(e.nGenTrk);
-      hsimPV["xsim"]->Fill(e.x * simUnit_);
-      hsimPV["ysim"]->Fill(e.y * simUnit_);
-      hsimPV["zsim"]->Fill(e.z * simUnit_);
-      hsimPV["xsimb"]->Fill(e.x * simUnit_ - vertexBeamSpot_.x(e.z));
-      hsimPV["ysimb"]->Fill(e.y * simUnit_ - vertexBeamSpot_.y(e.z));
-      hsimPV["zsimb"]->Fill(e.z * simUnit_ - vertexBeamSpot_.z0());
+  Fill(hsimPV, "nsimvtx", simEvts.size());
+  for (auto const& e : simEvts) {
 
-      if (f4D_) {
-        hsimPV["tsim"]->Fill(e.t);
-      }
-    }else if (e.type == FROM_PU_SUMMARY) {
-      hsimPV["zsim"]->Fill(e.z * simUnit_);
-      hsimPV["zsimb"]->Fill(e.z * simUnit_ - vertexBeamSpot_.z0());
-      if (f4D_) {
-        hsimPV["tsim"]->Fill(e.t);
+    if (e.type == FROM_TRACKING_TRUTH or e.type == FROM_PU_SUMMARY) {
+
+      Fill(hsimPV, "zsim", e.z * simUnit_, e.is_signal());
+      Fill(hsimPV, "zsimb", e.z * simUnit_ - vertexBeamSpot_.z0(), e.is_signal());
+      Fill(hsimPV, "dzminsim", e.dzmin * simUnit_, e.is_signal());
+      if (f4D_) Fill(hsimPV, "tsim", e.t, e.is_signal());
+
+      if (e.type == FROM_TRACKING_TRUTH) {
+        Fill(hsimPV, "nbsimtksinvtx", float(e.nGenTrk), e.is_signal());
+        Fill(hsimPV, "xsim", e.x * simUnit_, e.is_signal());
+        Fill(hsimPV, "ysim", e.y * simUnit_, e.is_signal());
+        Fill(hsimPV, "xsimb", e.x * simUnit_ - vertexBeamSpot_.x(e.z), e.is_signal());
+        Fill(hsimPV, "ysimb", e.y * simUnit_ - vertexBeamSpot_.y(e.z), e.is_signal());
+
+        Fill(hsimPV, "logpthatsim", std::log10(e.pt_hat), e.is_signal());
+        Fill(hsimPV, "logsumptsim", std::log10(e.sumpt), e.is_signal());
+        Fill(hsimPV, "logsumpt2sim", std::log10(e.sumpt2), e.is_signal());
       }
     }
   }
 }
-
-
-
-
-
-
 
 void PrimaryVertexAnalyzer4PU::beginJob() {
   matchsummaries_ = 2;   // number of match summaries to be dumped
@@ -4717,11 +4721,10 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 {
   fillVertexHistos(h, vtype, v, tracks, deltaz, verbose);
 
-
   // now fill properties wrt the matched simvertex
   assert(v.sim != NOT_MATCHED_VTX_SIM);
   const SimEvent& simevt = simEvt[v.sim];
-  
+
   unsigned int ntiming = 0;
   unsigned int ntiming_qual05 = 0;
   unsigned int ntiming_qual08 = 0;
@@ -4739,9 +4742,9 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   // these histograms are also filled for unmatched vertices, the false flag prevents double bookings
   Fill(h, vtype + "/nseltrkvtx", float(nseltrk), simevt.is_signal(), false);
   Fill(h, vtype + "/ptmax2", v.ptmax2(), simevt.is_signal(), false);
-  
+
   // note that this is redundant with some histos filled in analyzevetexcollectiontp
-  
+
   double xsim = simevt.x;
   double ysim = simevt.y;
   double zsim = simevt.z;
@@ -4755,6 +4758,23 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   Fill(h, vtype + "/xrecsimpull", (v.x() - xsim) / v.xError(), simevt.is_signal());
   Fill(h, vtype + "/yrecsimpull", (v.y() - ysim) / v.yError(), simevt.is_signal());
   Fill(h, vtype + "/zrecsimpull", (v.z() - zsim) / v.zError(), simevt.is_signal());
+
+  if (simevt.type == FROM_TRACKING_TRUTH or simevt.type == FROM_PU_SUMMARY) {
+
+    Fill(h, vtype + "/zsim", simevt.z * simUnit_, simevt.is_signal());
+    Fill(h, vtype + "/dzminsim", simevt.dzmin * simUnit_, simevt.is_signal());
+    if (f4D_) Fill(h, vtype + "/tsim", simevt.t, simevt.is_signal());
+
+    if (simevt.type == FROM_TRACKING_TRUTH) {
+      Fill(h, vtype + "/nbsimtksinvtx", float(simevt.nGenTrk), simevt.is_signal());
+      Fill(h, vtype + "/xsim", simevt.x * simUnit_, simevt.is_signal());
+      Fill(h, vtype + "/ysim", simevt.y * simUnit_, simevt.is_signal());
+
+      Fill(h, vtype + "/logpthatsim", std::log10(simevt.pt_hat), simevt.is_signal());
+      Fill(h, vtype + "/logsumptsim", std::log10(simevt.sumpt), simevt.is_signal());
+      Fill(h, vtype + "/logsumpt2sim", std::log10(simevt.sumpt2), simevt.is_signal());
+    }
+  }
 
   if (f4D_)
     {
@@ -4842,8 +4862,6 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 	  report_counted("fillVertexHistosMatched: timing from tracks failed",1);
 	  //reportVertex(*v, Form("timing from tracks failed,  with tracks: %f", v.tError()), false);
 	}
-
-      
     }
 }
 /***************filvertexhistosMatched**********************************************************************/
@@ -6144,8 +6162,6 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
   e.y = genXyz0.y();
   e.z = genXyz0.z();
   e.t = t0;
-  
-
 
   e.pt_hat = 0;
   for(size_t it = 0; it < gen.size(); it++){
@@ -6173,7 +6189,6 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
       }
     }
 
-    
       /*
       cout << "gen " << it << "  pdg " <<  cand.pdgId() <<  "(" << parentpdgid << ") " << " charge= " <<cand.charge() << " pt=" << cand.pt()
 	 <<  " phi=" << cand.phi()
@@ -6239,11 +6254,12 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
   e.pxvis = 0;
   e.pyvis = 0;
   e.sumpt2 = 0;
+  e.dzmin = 999.;
   e.x = vsim->position().x() * simUnit_;
   e.y = vsim->position().y() * simUnit_;
   e.z = vsim->position().z() * simUnit_;
   e.t = vsim->position().t() * simtUnit_;
-  
+
   simEvt.push_back(e);
   for (unsigned int i = 0; i < tracks.size(); i++) {
     MTrack& t = tracks[i];
@@ -6251,7 +6267,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
     if (t.selected()) {
       simEvt[0].rtk.push_back(t);
     }
-    
+
     // fill the matching info for the MTrack
     t._matched = 0;
     t._simEvt = &simEvt[0];
@@ -6264,7 +6280,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
         t._is_primary = true;
     //  }
   }
-  
+
   return simEvt;
 }//getSimEvents_simtrks
 /********************************************************************************************************/
@@ -6281,7 +6297,6 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
 // collect information about simulated collisions from tracking particles / vertices
 /********************************************************************************************************/
 {
-
   const TrackingParticleCollection* simTracks = TPCollectionH.product();
 
   vector<SimEvent> simEvt;
@@ -6308,6 +6323,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
       e.nChTP = 0;
       e.sumpt = 0;
       e.sumpt2 = 0;
+      e.dzmin = 999.;
       const TrackingVertex* parentVertex = it->parentVertex().get();
       if (DEBUG_) {
         cout << "getSimEvents_tp: ";
@@ -6426,6 +6442,14 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
       simEvt[i].zfit = -99;
       simEvt[i].tfit = -99;
     }
+
+    auto dzmin = -1.;
+    for (uint vj = 0; vj < simEvt.size(); ++vj) {
+      if(i == vj) continue;
+      auto const dz = std::abs(simEvt[i].z - simEvt[vj].z);
+      if(dzmin < 0. or dz < dzmin) dzmin = dz;
+    }
+    simEvt[i].dzmin = dzmin < 0. ? 999. : dzmin;
 
     if (DEBUG_) {
       cout << setw(3) << i << " )   nTP=" << setw(4) << simEvt[i].tp.size() << "   z=" << setw(8) << setprecision(4)
