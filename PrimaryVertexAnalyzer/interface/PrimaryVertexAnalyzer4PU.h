@@ -312,6 +312,7 @@ public:
       y = 0;
       z = -99;
       t = 0;
+      dzmin = 999.;
       nChTP = 0;     // number of charged particles
       ptvis = 0;
       pxvis = 0;
@@ -342,6 +343,7 @@ public:
     // 2 = partially filled (from PileUpSummary)
 
     double x, y, z, t;
+    double dzmin;
     double xfit, yfit, zfit, tfit;
     int nChTP;
     double ptvis, pxvis, pyvis;
@@ -1277,14 +1279,13 @@ private:
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
 
-
   void addn(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram in a subdirectory and use the subdirectory name in the map key
     h[gDirectory->GetName() + std::string("/") + hist->GetName()] = hist;
     hist->StatOverflows(kTRUE);
     hist->SetDirectory(gDirectory);
   }
-  
+
   void add(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram
     h[hist->GetName()] = hist;
@@ -1305,7 +1306,6 @@ private:
   }
 
   void addSP(std::map<std::string, TH1*>& h, TH1* hist) {
-
     // add a histogram + two versions (Signal and PU)
     std::string name = hist->GetName();
     std::string title = hist->GetTitle();
