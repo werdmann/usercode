@@ -38,7 +38,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
@@ -126,7 +126,7 @@ typedef ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::
 typedef reco::Vertex::trackRef_iterator trackit_t;
 
 // class declaration
-class PrimaryVertexAnalyzer4PU : public edm::EDAnalyzer {
+class PrimaryVertexAnalyzer4PU : public edm::one::EDAnalyzer<> {
   typedef math::XYZTLorentzVector LorentzVector;
   typedef reco::TrackBase::ParameterVector ParameterVector;
 
