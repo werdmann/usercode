@@ -4186,7 +4186,7 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
     if (v.trackWeight(*tk) > 0.5) {
       auto trk = tracks.from_ref(*tk);
       if (trk.has_timing() && (trk.timeQuality() >= minquality)) {
-	double w = v.trackWeight(*tk);
+	double w = v.trackWeight(*tk) / (trk.MTD_timeerror()*trk.MTD_timeerror());
         wsum += w;
 	for(unsigned int j=0; j < 3; j++){
 	  tsum += w * trk.th[j] * a[j];
@@ -4240,6 +4240,7 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 		    }
 		    wsum += wsum_trk;
 		    w2sum += wsum_trk * wsum_trk * (dt * dt); // 100 % correlation among th[j]
+		    w2sum += wsum_trk * wsum_trk * (dt * dt) / v.trackWeight(*tk); 
 		  }
 	      }
 	  }
