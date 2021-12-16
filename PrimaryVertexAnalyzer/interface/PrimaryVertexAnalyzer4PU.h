@@ -301,8 +301,8 @@ public:
   // forward declarations
   class MTrack;
   class Tracks;
-  
-  // aclass holding simulated events
+
+  // a class holding simulated events
   class SimEvent {
   public:
     SimEvent(unsigned int idx) {
@@ -357,8 +357,8 @@ public:
     std::vector<MTrack> rtk;              // all selected MTracks matched to this simevent
     std::vector<MTrack> rtkprim;          // all selected MTracks matched to this simevent that come from within 5 microns of the simvertex
     std::vector<MTrack> rtkprimsel;       // all selected MTracks matched to this simevent that pass the ip/sigma(ip) < 4 cut (rec wrt beam) ?????
-    std::vector<unsigned int> trkidx;        // list of MTrack indices, used anywher?
-    
+    std::vector<unsigned int> trkidx;        // list of MTrack indices, used anywhere?
+
     double Tc, chisq, dzmax, dztrim, m4m2;  // filled by getSimEvents via "getTc"
     double sumpt2, sumpt;                   // filled by getSimEvents
     
@@ -647,6 +647,8 @@ public:
       weights[tk->key()] = weight;
     }
 
+    bool has_track_key(uint const tkey) const { return weights.count(tkey); }
+
     unsigned int tracksSize() const {return tracks.size();};
     float trackWeight (MTrack const * tk)const { return weights.at(tk->key());};
     float trackWeight (MTrack const & tk)const { return weights.at(tk.key());};
@@ -771,11 +773,13 @@ public:
     std::vector<MVertex> vtxs;
   };
 
-  
 
 
-  
-  /* MTrack is a helper class for collecting track related information and provide a common interface for reco::Track and minoad cndidate based tracks */
+
+
+
+
+  /* MTrack is a helper class for collecting track related information and provide a common interface for reco::Track and minoad candidate based tracks */
   class MTrack {
   public:
 
@@ -1131,11 +1135,9 @@ public:
   };
 
 
-
-      /* collect information on reco tracks in one place
+  /* collect information on reco tracks in one place
      basically a vector of MTracks with some extra info and pointers
-   */
-
+  */
   class Tracks {
   public:
     edm::Handle<edm::View<reco::Track> > trackCollectionH;
@@ -1167,7 +1169,7 @@ public:
 
     MTrack& from_ref(const edm::RefToBase<reco::Track> ref) { return from_key(ref.key()); }
 
-    unsigned int simevent_index_from_key(const unsigned int key){
+    unsigned int simevent_index_from_key(const unsigned int key) {
       MTrack& tk = from_key(key);
       if (tk.matched()){
 	return tk._simEvt->index;
@@ -1612,6 +1614,7 @@ private:
 				    std::vector<SimEvent>& simEvt,
 				    const std::string message = "");
 
+  void analyzeVertexTrackAssociation(std::map<std::string, TH1*>& h, MVertexCollection& vtxs, Tracks& tracks, std::vector<SimEvent> const& simEvt, float const npu);
 
   void analyzeVertexComposition(std::map<std::string, TH1*>& h,
                                    MVertex & v,
