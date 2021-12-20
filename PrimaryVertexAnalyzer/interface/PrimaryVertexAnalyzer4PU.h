@@ -536,7 +536,8 @@ public:
 
     MVertex(const reco::Vertex* v){
       init();
-      recvtx = v;      
+      recvtx = v;
+      _index = NO_INDEX;
     };
 
     MVertex(const reco::Vertex* v, unsigned int idx){
@@ -800,7 +801,7 @@ public:
       _MTD_timeerror = 1e10;
       _MTD_momentum = 0;
 
-      _recv.clear();
+      _recv.clear();    // for reco this is filled in get_reco_and_transient_tracks, for miniaod in the MVertex constructor
       _weight.clear();
 
       // filled later by getSimEvents
@@ -883,9 +884,10 @@ public:
 	pv = cand.vertexRef().key();
 	weight = 0.1; // < 0.5
       }
-      _recv[vertexcollection_label] = pv;
-      _weight[vertexcollection_label] = weight;
-
+      if ((_recv.find(vertexcollection_label) == _recv.end() || _weight[vertexcollection_label] < weight) ){
+	_recv[vertexcollection_label] = pv;
+	_weight[vertexcollection_label] = weight;
+      }
       
       // timing
       if (f4D) {
@@ -1275,6 +1277,7 @@ private:
   double vertex_sumpt(const reco::Vertex&);
   bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
   bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
+  bool vertex_time_from_tracks_pid_newton(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
 
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
@@ -1680,8 +1683,17 @@ private:
   }
 
   //timers
+  class PVTimer{
+  public:
+    PVTimer(){duration=0; counter=0;};
+    double duration;
+    unsigned int counter;
+  };
+  
   std::map<std::string, std::chrono::time_point<std::chrono::steady_clock> > timer_start_;
   std::map<std::string, double> timers_;
+  std::map<std::string, PVTimer> pvtimers_;
+
   void inline timer_start(const std:: string label){
     timer_start_[label] = std::chrono::steady_clock::now();
   }
@@ -1689,17 +1701,10 @@ private:
     auto stop = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - timer_start_[label]);
     timers_[label] += duration.count();
+    auto & timer = pvtimers_[label];
+    timer.duration += duration.count();
+    timer.counter ++;
   }
-
-  /*  --> EXTRAS
-  bool getBXLumi_from_files();
-
-  int time_of_last_reset(const edm::Event& iEvent);
-
-  bool load_lumisection_lumi_from_file();
- uint32_t orbitOfLastReset_;
-  int tres_;
-  */
 
   // ----------member data ---------------------------
 
