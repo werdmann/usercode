@@ -1914,16 +1914,14 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
                            "sellost",
                            "wgt05",
                            "wlt05",
-                           "thipu",
-                           "ttail",
-                           "ttailzgt1",
-                           "hiptcentral",
+                           "trkselhipt",
+                           "trkselhiptfwd",
+                           "trkselhiptcentral",
                            "unmatchedVtx",
                            "seltpmatched",
                            "seltpmatchedSignal",
                            "seltpmatchedPU",
                            "seltpunmatched",
-                           "seltpmatched_tgt1",
 			   "MTDtail",
                            "fakevtxdriver",
                            "realvtxdriver",
@@ -10592,7 +10590,15 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
     
     if ( tk.selected() ){
       fillTrackHistos(h, "trksel", tk, pv0_ptr);
-
+      if (abs(tk.pt()) > 3.){
+	  fillTrackHistos(h, "trkselhipt", tk);
+	  if(abs(tk.eta())<1.5){
+	    fillTrackHistos(h, "trkselhiptcentral", tk);
+	  }else if(abs(tk.eta())>3.0){
+	    fillTrackHistos(h, "trkselhiptfwd", tk);
+	  }
+      }
+	
       nseltrks++;
       if (tk.pt() < 0.4)
         nseltrksptlt04++;
@@ -10627,23 +10633,9 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
 	fillTrackHistos(h, "alletadriver", tk, pv0_ptr);
       }
 
-      if (is_hiPU) {
-        fillTrackHistos(h, "thipu", tk, pv0_ptr);
-      }  // all tracks here, not only those that are in a vertex (->"hipu" without a "t")
-
-      if (is_tail) {
-        fillTrackHistos(h, "ttail", tk, pv0_ptr);
-        if (fabs(tk.z() - vertexBeamSpot_.z0() - dzb_) > sigmaZ_)
-          fillTrackHistos(h, "ttailzgt1", tk, pv0_ptr);
-      }
-
       if (MC_) {
         if (tk.matched()) {
           fillTrackHistos(h, "seltpmatched", tk);
-	  if (abs(tk.pt() > 10.) && (abs(tk.eta())<0.5))
-	    fillTrackHistos(h, "hiptcentral", tk);
-          if (abs(tk.t()) > 1.0)
-            fillTrackHistos(h, "seltpmatched_tgt1", tk);
 	  if (tk._simEvt == 0){
             fillTrackHistos(h, "seltpmatchedSignal", tk);
 	  }else{
@@ -10660,7 +10652,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
       } // (M_C)
 
       // is the track tk (not) part of any vertex?
-      if (tk._recv.size() == 0){ // FIXME this should depend on the label
+      if (tk.get_recv(vtxs.label()) == NO_RECVTX){
         fillTrackHistos(h, "sellost", tk);
       }
     }
