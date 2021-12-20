@@ -8,6 +8,7 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/Math/interface/Point3D.h"
+#include "DataFormats/Math/interface/deltaPhi.h"
 #include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
 
 // simulated vertices,..., add <use name=SimDataFormats/Vertex> and <../Track>
@@ -689,7 +690,56 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   addSP(h, new TProfile("utrkAssignmentEfficiencyvsntrk", "track to vertex assignment efficiency vs number of tracks",
 			51, 0., 51, 0., 2.));  // last bin is overflow
 
- 
+  {// analyzeVertexTrackAssociation
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpPt", "trkVtxAssocEffic_TPMatchedTracks_tpPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpEta", "trkVtxAssocEffic_TPMatchedTracks_tpEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt000to001", "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt001to003", "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt003to010", "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt010toINF", "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpPt", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt000to001", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt001to003", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt003to010", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt010toINF", "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpPt", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt000to001", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt001to003", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt003to010", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt010toINF", "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkPt", "trkVtxAssocPurity_TracksOfRecoVtx_trkPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkEta", "trkVtxAssocPurity_TracksOfRecoVtx_trkEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt000to001", "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt001to003", "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt003to010", "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt010toINF", "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkPt", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt000to001", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt001to003", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt003to010", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt010toINF", "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkPt", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkPt", 100, 0., 5.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt000to001", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt000to001", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt001to003", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt001to003", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt003to010", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt003to010", 160, -4., 4.));
+    addSP(h, new TH1F("trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt010toINF", "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt010toINF", 160, -4., 4.));
+
+    addSP(h, new TProfile("trkVtxAssocPurity_vs_pu", "track-vertex purity vs PU", npubin2, 0., npumax, 0., 2.));
+    addSP(h, new TProfile("trkVtxAssocPurity_vs_vz", "track-vertex purity vs vz", nzbin_wide_fine, -zrange_wide, zrange_wide, 0., 1.));
+
+    addSP(h, new TProfile("trkVtxAssocPurityWithoutFakeRecoVtxs_vs_pu", "track-vertex purity vs PU", npubin2, 0., npumax, 0., 2.));
+    addSP(h, new TProfile("trkVtxAssocPurityWithoutFakeRecoVtxs_vs_vz", "track-vertex purity vs vz", nzbin_wide_fine, -zrange_wide, zrange_wide, 0., 1.));
+  }
+
   addSP(h, new TProfile("effallvsnrectp", "efficiency (all) vs # truth matched rec tracks", 50, 0., 50., 0, 1.));
   addSP(h, new TProfile("effallvsngentp", "efficiency (all) vs # visible tracking particles", 50, 0., 50., 0, 1.));
   addSP(h, new TProfile("effselvsnrectp", "efficiency (sel) vs # truth matched rec tracks", 50, 0., 50., 0, 1.));
@@ -1975,26 +2025,34 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addn(h, new TH1D("missing_outer", "number of missing strip hits", 20, 0., 20.));
     addn(h, new TH1D("missing_fraction", "fraction of missing hits", 10, 0., 1.));
     addn(h, new TH1D("npxminmiss", "number of pixel layers minus missing hits", 12, -2., 10.));
-    
-    // some histograms wrt to MC truth
-    addn(h, new TH1D("tkzrecsim", "zrec-zsim", 200, -0.1, 0.1));
-    addn(h, new TH1D("tkzrecsimpull", "(zrec-zsim) / #sigma_{z}", 300, -15., 15.));
-    addn(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", 100, -4., 4., 0., 1000.));
-    addn(h, new TH2F("tkzrecsimpullvseta", "zrec-zsim pull vs eta", 100, -4., 4., 200, -20., 20.));
-    addn(h, new TProfile("tkzrecsimvsz",   "zrec-zsim vs z", 100, -15., 15., -1000., 1000.));
-    addn(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", 100, -4., 4., -1000., 1000.));
-    addn(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", 100, -4., 4., -1000., 1000.));
-    addn(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", 40, -2., 2., 200, -4., 4.));
 
-    addn(h, new TH1D("tktrecsim", "trec-tsim", 200, -0.3, 0.3));
-    addn(h, new TH1D("tktrecsimpull", "(trec-tsim)/terr", 200, -10., 10.));
-    addn(h, new TH1D("tktrecsim_pid", "trec-tsim (pid)", 200, -0.3, 0.3));
-    addn(h, new TH1D("tktrecsimpull_pid", "(trec-tsim)/terr (pid)", 200, -10., 10.));
-    addn(h, new TH1D("tktrecsimpullwide", "trec-tsim", 200, -20., 20.));
-    addn(h, new TH2F("tktrecsimvseta2d", "trec-tsim vs eta", 40, -4., 4., 200, -1.0, 1.0));
-    addn(h, new TProfile("tktrecsimpullsqvserr", "((trec-tsim)/terr)**2 vs terr", 50, 0., 0.5, 0., 100.0));
-    addn(h, new TH2F("tktrecsimpullvserr", "(trec-tsim)/terr vs terr", 50, 0., 0.5, 50, 0., 100.0));
-    addn(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -1000., 1000.));
+    // fillTrackHistosMatched
+    //  - tracks with MC truth (matched to TrackingParticles)
+    addnSP(h, new TH1D("tkzrecsim", "zrec-zsim", 200, -0.1, 0.1));
+    addnSP(h, new TH1D("tkzrecsimpull", "(zrec-zsim) / #sigma_{z}", 300, -15., 15.));
+    addnSP(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", 100, -4., 4., 0., 1000.));
+    addnSP(h, new TH2F("tkzrecsimpullvseta", "zrec-zsim pull vs eta", 100, -4., 4., 200, -20., 20.));
+    addnSP(h, new TProfile("tkzrecsimvsz",   "zrec-zsim vs z", 100, -15., 15., -1000., 1000.));
+    addnSP(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", 100, -4., 4., -1000., 1000.));
+    addnSP(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", 100, -4., 4., -1000., 1000.));
+    addnSP(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", 40, -2., 2., 200, -4., 4.));
+
+    addnSP(h, new TH2F("tkptrecsimrelvssimeta2d", "(pTrec-pTsim)/pTrec vs eta_{TP}", 100, -5., 5., 300, -0.3, 0.3));
+    addnSP(h, new TH2F("tkptrecsimpullvssimeta2d", "pTrec-pTsim pull vs eta_{TP}", 100, -5., 5., 100, -15., 15.));
+    addnSP(h, new TH2F("tketarecsimvssimeta2d", "etarec-etasim vs eta_{TP}", 100, -5., 5., 100, -0.05, 0.05));
+    addnSP(h, new TH2F("tkphirecsimvssimeta2d", "phirec-phisim vs eta_{TP}", 100, -5., 5., 100, -0.05, 0.05));
+    addnSP(h, new TH2F("tkzrecsimvssimeta2d", "zrec-zsim vs eta_{TP}", 100, -5., 5., 200, -0.2, 0.2));
+    addnSP(h, new TH2F("tkzrecsimpullvssimeta2d" , "zrec-zsim pull vs eta_{TP}", 100, -5., 5., 300, -15., 15.));
+
+    addnSP(h, new TH1D("tktrecsim", "trec-tsim", 200, -0.3, 0.3));
+    addnSP(h, new TH1D("tktrecsimpull", "(trec-tsim)/terr", 200, -10., 10.));
+    addnSP(h, new TH1D("tktrecsim_pid", "trec-tsim (pid)", 200, -0.3, 0.3));
+    addnSP(h, new TH1D("tktrecsimpull_pid", "(trec-tsim)/terr (pid)", 200, -10., 10.));
+    addnSP(h, new TH1D("tktrecsimpullwide", "trec-tsim", 200, -20., 20.));
+    addnSP(h, new TH2F("tktrecsimvseta2d", "trec-tsim vs eta", 40, -4., 4., 200, -1.0, 1.0));
+    addnSP(h, new TProfile("tktrecsimpullsqvserr", "((trec-tsim)/terr)**2 vs terr", 50, 0., 0.5, 0., 100.0));
+    addnSP(h, new TH2F("tktrecsimpullvserr", "(trec-tsim)/terr vs terr", 50, 0., 0.5, 50, 0., 100.0));
+    addnSP(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -1000., 1000.));
     dir->cd();
   }  // track types
   
@@ -4498,6 +4556,7 @@ void PrimaryVertexAnalyzer4PU::fillRecoVertexHistos(std::map<std::string, TH1*>&
   for (trackit_t t = v->tracks_begin(); t != v->tracks_end(); t++) {
     auto tk = tracks.from_ref(*t);
     fillTrackHistos(h, vtype, tk, v);   // select based on weight here?
+
     Fill(h, vtype + "/trkweight", v->trackWeight(*t));
     Fill(h, vtype + "/trkptnorm", t->get()->pt(), 1./  v->tracksSize());
     if ( v->trackWeight(*t) < 0.6) nlowt += 1;
@@ -4624,6 +4683,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistos(std::map<std::string, TH1*>& h,
   int nlowt = 0;
   for( auto  tk : v.tracks ){
     fillTrackHistos(h, vtype, *tk, v.recvtx);   // select based on weight here?
+
     Fill(h, vtype + "/trkweight", v.trackWeight(tk));
     Fill(h, vtype + "/trkptnorm", tk->pt(), 1./  v.tracksSize());
     if ( v.trackWeight(tk) < 0.6) nlowt += 1;
@@ -4867,18 +4927,12 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 }
 /***************filvertexhistosMatched**********************************************************************/
 
-
-
-
-
-void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h,
-                                               const std::string& ttype,
-                                               MTrack& tk,
-                                               const reco::Vertex* v) {
-  if(! fill_track_histos_) return;
+void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h, const std::string& ttype, MTrack& tk, const reco::Vertex* v) {
+  if(not fill_track_histos_) return;
   timer_start("fillTrackHistos");
+
   if(tk.has_track()) fillRecoTrackHistos(h, ttype, tk.track());
-  
+
   if (f4D_ && tk.has_timing())
     {
       Fill(h, ttype + "/t0trk", tk.t());
@@ -4891,8 +4945,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h,
       }
     }
 
-  
-  if ((!(v == NULL)) && (v->isValid()) && (v->ndof() > 10.)) {
+  if (v != NULL && v->isValid() && v->ndof() > 10.) {
     double zvtx = v->position().z();
     double dz2 = tk.dz() * tk.dz() + (pow(wx_ * cos(tk.phi()), 2) + pow(wy_ * sin(tk.phi()), 2)) / pow(tan(tk.theta()), 2); // really?
     Fill(h, ttype + "/zrestrk", tk.z() - zvtx);
@@ -4905,13 +4958,10 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h,
     Fill(h, ttype + "/zpulltrkvsz", tk.z(), pow(tk.z() - zvtx, 2) / (pow(v->zError(), 2) + dz2));
     Fill(h, ttype + "/zpulltrk", (tk.z() - zvtx) / sqrt(pow(v->zError(), 2) + dz2));
   }
-      
+
   fillTrackHistosMatched(h, ttype, tk);
-  
   timer_stop("fillTrackHistos");
-
 }
-
 
 // basically obsolete, all of this can be done with MTracks
 void PrimaryVertexAnalyzer4PU::fillTransientTrackHistos(std::map<std::string, TH1*>& h,
@@ -5048,44 +5098,72 @@ void PrimaryVertexAnalyzer4PU::fillRecoTrackHistos(std::map<std::string, TH1*>& 
   //-------------------------------------------------------------------
 }
 
+void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*>& h, const std::string& ttype, MTrack& tk) {
+  // ref to MultiTrackValidator (MTV):
+  // https://github.com/cms-sw/cmssw/blob/f0cac195d32cda5f4f48bfd99a751449e7624861/Validation/RecoTrack/src/MTVHistoProducerAlgoForTracker.cc#L2398
+  if(not tk.matched()) return;
 
-void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*>& h,
-                                               const std::string& ttype,
-                                               MTrack& tk) 
-{
-  if(!(tk.matched())) return;
-  Fill(h, ttype + "/tkzrecsim", tk.z() - tk.zsim());
-  Fill(h, ttype + "/tkzrecsimpull", (tk.z() - tk.zsim())/tk.dz());
-  Fill(h, ttype + "/tkzrecsimpullvseta", tk.eta(), (tk.z() - tk.zsim())/tk.dz());
-  Fill(h, ttype + "/tkzrecsimpullsqvseta", tk.eta(),    pow((tk.z() - tk.zsim())/tk.dz(), 2));
-  Fill(h, ttype + "/tkzrecsimvseta", tk.eta(), tk.z() - tk.zsim());
-  Fill(h, ttype + "/tkzrecsimvseta2d", tk.eta(), tk.z() - tk.zsim());
-  Fill(h, ttype + "/tkzrecsimvsz", tk.zsim(), tk.z() - tk.zsim());
-  double flip = tk.eta() < 0 ? -1. : 1.;
-  Fill(h, ttype + "/tkzrecsimvslogpt", log(tk.pt())/log(10.), (tk.z() - tk.zsim()) * flip );
-  flip = tk.z() < 0 ? -1 : 1.;
-  Fill(h, ttype + "/tkzrecsimvsetaz", tk.eta(), (tk.z() - tk.zsim()) * flip);
-  
-  if (f4D_ && tk.has_timing()){
-    Fill(h, ttype + "/tktrecsim", tk.t() - tk.tsim());
-    Fill(h, ttype + "/tktrecsimpull", (tk.t() - tk.tsim())/tk.dt());
-    Fill(h, ttype + "/tktrecsimpullwide", (tk.t()  - tk.tsim() )/tk.dt() );
-    Fill(h, ttype + "/tktrecsimvseta2d", tk.eta() , tk.t()  - tk.tsim() );
-    Fill(h, ttype + "/tktrecsimpullsqvserr", tk.dt() , pow((tk.t()  - tk.tsim() ) / tk.dt() , 2));
-    Fill(h, ttype + "/tktrecsimpullvserr", tk.dt() , (tk.t()  - tk.tsim()) / tk.dt());
+  // TrackingParticle matched to this recoTrack originates from the signal SimVertex
+  auto const isSignalPV = (tk._simEvt->index == 0);
+
+  auto const rec_pt = tk.pt();
+  auto const rec_eta = tk.eta();
+  auto const rec_phi = tk.phi();
+  auto const rec_z = tk.z();
+  auto const rec_dz = tk.dz();
+
+  auto const sim_pt = tk._tpr->pt();
+  auto const sim_eta = tk._tpr->eta();
+  auto const sim_phi = tk._tpr->phi();
+  auto const sim_z = tk.zsim();
+
+  auto const dptDiff = (rec_pt - sim_pt);
+  auto const dptDiffRel = dptDiff/rec_pt;
+  auto const dptPull = dptDiff/tk.ptError();
+  auto const detaDiff = (rec_eta - sim_eta);
+  auto const dphiDiff = reco::deltaPhi(rec_phi, sim_phi);
+
+  auto const dzDiff = (rec_z - sim_z);
+  auto const dzPull = dzDiff/rec_dz;
+
+  Fill(h, ttype + "/tkzrecsim", dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimpull", dzPull, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimpullvseta", rec_eta, dzPull, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimpullsqvseta", rec_eta, dzPull*dzPull, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvseta", rec_eta, dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvseta2d", rec_eta, dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvsz", sim_z, dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvslogpt", log(rec_pt)/log(10.), dzDiff * (rec_eta < 0. ? -1. : 1.), isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvsetaz", rec_eta, dzDiff * (rec_z < 0. ? -1. : 1.), isSignalPV);
+
+  Fill(h, ttype + "/tkptrecsimrelvssimeta2d", sim_eta, dptDiffRel, isSignalPV);
+  Fill(h, ttype + "/tkptrecsimpullvssimeta2d", sim_eta, dptPull, isSignalPV);
+  Fill(h, ttype + "/tketarecsimvssimeta2d", sim_eta, detaDiff, isSignalPV);
+  Fill(h, ttype + "/tkphirecsimvssimeta2d", sim_eta, dphiDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimvssimeta2d", sim_eta, dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimpullvssimeta2d", sim_eta, dzPull, isSignalPV);
+
+  if (f4D_ and tk.has_timing()){
+
+    auto const rec_t = tk.t();
+    auto const rec_dt = tk.dt();
+    auto const sim_t = tk.tsim();
+
+    auto const dtDiff = (rec_t - sim_t);
+    auto const dtPull = dtDiff/rec_dt;
+    auto const dtPull2 = dtPull*dtPull;
+
+    Fill(h, ttype + "/tktrecsim", dtDiff, isSignalPV);
+    Fill(h, ttype + "/tktrecsimpull", dtPull, isSignalPV);
+    Fill(h, ttype + "/tktrecsimpullwide", dtPull, isSignalPV);
+    Fill(h, ttype + "/tktrecsimvseta2d", rec_eta, dtDiff, isSignalPV);
+    Fill(h, ttype + "/tktrecsimpullsqvserr", rec_dt, dtPull2, isSignalPV);
+    Fill(h, ttype + "/tktrecsimpullvserr", rec_dt, dtPull, isSignalPV);
   }
 }
 
-
-
-
-
-void PrimaryVertexAnalyzer4PU::fillTrackClusterHistos(std::map<std::string, TH1*>& h,
-                                                      const std::string& ttype,
-                                                      const reco::Track& t,
-                                                      const reco::Vertex* v) {
-  if (!RECO_)
-    return;
+void PrimaryVertexAnalyzer4PU::fillTrackClusterHistos(std::map<std::string, TH1*>& h, const std::string& ttype, const reco::Track& t, const reco::Vertex* v) {
+  if (!RECO_) return;
 
   for (trackingRecHit_iterator hit = t.recHitsBegin(); hit != t.recHitsEnd(); hit++) {
     const DetId& hit_detId = (**hit).geographicalId();
@@ -8397,14 +8475,14 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
 {
   // track counters per simEvt
   VertexCounter nt;     // all
-  VertexCounter ntMTD;  // in MTD acceptace
+  VertexCounter ntMTD;  // in MTD acceptance
 
   // weighted sums (aka purities)
   double sum_pt(0), sum_pt_majority(0), sum_pt_minority(0), sum_pt_unmatched(0);
   double sum_nt(0), sum_nt_majority(0), sum_nt_minority(0), sum_nt_unmatched(0);
   double sum_wt(0), sum_wt_majority(0), sum_wt_minority(0), sum_wt_unmatched(0);
 
-   // count tracks in the rec vertex
+  // count tracks in the rec vertex
   for (auto tv : v.tracks){
     Float_t wt = v.trackWeight(tv);
     if (wt<0.5) continue;
@@ -8436,7 +8514,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
       }
   }
 
-  
   // fill histograms
   if (v.is_signal()) {
     Fill(h, "MTDTDR", sum_nt_minority);
@@ -8518,7 +8595,163 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
 }//analyzeVertexComposition
 /*********************************************************************************/
 
+void PrimaryVertexAnalyzer4PU::analyzeVertexTrackAssociation(std::map<std::string, TH1*>& h, MVertexCollection& vtxs, Tracks& tracks, std::vector<SimEvent> const&, float const npu){
+  //
+  // Track-Vertex Association: Efficiency
+  //
+  // - denominator:
+  //   - tracks matched to a TrackingParticle (TP-matched tracks)
+  // - numerators:
+  //   - TP-matched tracks assigned to a recoVertex
+  //   - TP-matched tracks assigned to the recoVertex matched to the TrackingVertex of the matched-TrackingParticle
+  //
+  for(auto const& tk : tracks){
+    // skip recoTracks not matched to a TrackingParticle
+    if (not tk.matched()) continue;
 
+    // the matched-TrackingParticle is assigned to the signal TrackingVertex (index == 0)
+    auto const isSignalSimVtx = tk._simEvt->is_signal();
+
+    // properties of the matched-TrackingParticle
+    auto const tpPt = tk._tpr->pt();
+    auto const tpEta = tk._tpr->eta();
+
+    // denominator: TP-matched tracks
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpPt", tpPt, isSignalSimVtx);
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpEta", tpEta, isSignalSimVtx);
+    if     (tpPt <  1.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt000to001", tpEta, isSignalSimVtx); }
+    else if(tpPt <  3.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt001to003", tpEta, isSignalSimVtx); }
+    else if(tpPt < 10.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt003to010", tpEta, isSignalSimVtx); }
+    else               { Fill(h, "trkVtxAssocEffic_TPMatchedTracks_tpEta_tpPt010toINF", tpEta, isSignalSimVtx); }
+
+    // find the recoVertex to which this recoTrack is assigned
+    // (max trackWeight above 0.5)
+    int bestRecoVtxIdx = -1;
+    auto maxTrkWgt = 0.f;
+    for (size_t vtxIdx=0; vtxIdx<vtxs.size(); ++vtxIdx){
+      if(not select(vtxs[vtxIdx])) continue;
+
+      if(not vtxs[vtxIdx].has_track_key(tk.key())) continue;
+
+      auto const wt = vtxs[vtxIdx].trackWeight(tk);
+      if(wt < 0.5) continue;
+
+      if(wt > maxTrkWgt or bestRecoVtxIdx == -1){
+        maxTrkWgt = wt;
+        bestRecoVtxIdx = vtxIdx;
+      }
+    }
+
+    // numerator #1: TP-matched recoTracks assigned to a(ny) recoVertex
+    auto const belongsToOneRecoVtx = (bestRecoVtxIdx >= 0);
+    if(not belongsToOneRecoVtx) continue;
+
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpPt", tpPt, isSignalSimVtx);
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta", tpEta, isSignalSimVtx);
+    if     (tpPt <  1.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt000to001", tpEta, isSignalSimVtx); }
+    else if(tpPt <  3.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt001to003", tpEta, isSignalSimVtx); }
+    else if(tpPt < 10.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt003to010", tpEta, isSignalSimVtx); }
+    else               { Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithRecoVtx_tpEta_tpPt010toINF", tpEta, isSignalSimVtx); }
+
+    // numerator #2: correct track-vertex association
+    // - the recoVertex to which the recoTrack is assigned corresponds to
+    //   the recoVertex matched to the TrackingVertex from which the matched-TrackingParticle originates
+
+    // index of the recoVertex (if any) matched to the TrackingVertex from which the matched-TrackingParticle originates
+    auto const idxOfRecoVtxOfSimVtx = tk._simEvt->rec;
+
+    auto const belongsToCorrectRecoVtx = (uint(bestRecoVtxIdx) == idxOfRecoVtxOfSimVtx);
+    if(not belongsToCorrectRecoVtx) continue;
+
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpPt", tpPt, isSignalSimVtx);
+    Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta", tpEta, isSignalSimVtx);
+    if     (tpPt <  1.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt000to001", tpEta, isSignalSimVtx); }
+    else if(tpPt <  3.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt001to003", tpEta, isSignalSimVtx); }
+    else if(tpPt < 10.){ Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt003to010", tpEta, isSignalSimVtx); }
+    else               { Fill(h, "trkVtxAssocEffic_TPMatchedTracksWithCorrectRecoVtx_tpEta_tpPt010toINF", tpEta, isSignalSimVtx); }
+  }
+
+  //
+  // Track-Vertex Association: Purity
+  //
+  // - denominator:
+  //   - recoTracks of a recoVertex
+  // - numerator:
+  //   - recoTracks of a recoVertex that are TP-matched,
+  //     and have the correct track-vertex association
+  //     (SimVertex of TP is matched to recoVertex of recoTrack)
+  //
+  for (auto const& v : vtxs){
+    // skip recoVertexs not passing selection criteria
+    if (not select(v)) continue;
+
+    auto const isSignalVtx = v.is_signal();
+
+    uint ntk = 0;
+    uint ntk_woFakeVtxs = 0;
+    uint ntk_matched = 0;
+    for (auto tv : v.tracks){
+      // restrict to recoTracks truly assigned to this recoVertex (trackWeight >= 0.5)
+      auto const wt = v.trackWeight(tv);
+      if (wt < 0.5) continue;
+
+      // denominator: recoTracks of a recoVertex
+      ++ntk;
+
+      auto const trkPt = tv->pt();
+      auto const trkEta = tv->eta();
+
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkPt", trkPt, isSignalVtx);
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkEta", trkEta, isSignalVtx);
+      if     (trkPt <  1.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt000to001", trkEta, isSignalVtx); }
+      else if(trkPt <  3.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt001to003", trkEta, isSignalVtx); }
+      else if(trkPt < 10.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt003to010", trkEta, isSignalVtx); }
+      else                { Fill(h, "trkVtxAssocPurity_TracksOfRecoVtx_trkEta_trkPt010toINF", trkEta, isSignalVtx); }
+
+      // restrict to recoVertexs that are matched to a SimVertex (i.e. skip fake recoVertexs)
+      auto const recoVtxHasSimMatch = (v.sim != NOT_MATCHED_VTX_SIM);
+      if(not recoVtxHasSimMatch) continue;
+
+      ++ntk_woFakeVtxs;
+
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkPt", trkPt, isSignalVtx);
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta", trkEta, isSignalVtx);
+      if     (trkPt <  1.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt000to001", trkEta, isSignalVtx); }
+      else if(trkPt <  3.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt001to003", trkEta, isSignalVtx); }
+      else if(trkPt < 10.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt003to010", trkEta, isSignalVtx); }
+      else                { Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxMatchedToSimVtx_trkEta_trkPt010toINF", trkEta, isSignalVtx); }
+
+      // index of the SimVertex from which the TrackingParticle matched to this recoTrack originates
+      // (for TP-unmatched recoTracks, this equals NOT_MATCHED_TK_SIM)
+      auto const tk_sim = tracks.simevent_index_from_key(tv->key());
+
+      // recoTrack is TP-matched and its recoVertex is matched to the SimVertex of the recoTrack's TP
+      auto const hasCorrectTrkVtxAsso = (tk_sim != NOT_MATCHED_TK_SIM and tk_sim == v.sim);
+      if(not hasCorrectTrkVtxAsso) continue;
+
+      ++ntk_matched;
+
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkPt", trkPt, isSignalVtx);
+      Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta", trkEta, isSignalVtx);
+      if     (trkPt <  1.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt000to001", trkEta, isSignalVtx); }
+      else if(trkPt <  3.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt001to003", trkEta, isSignalVtx); }
+      else if(trkPt < 10.){ Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt003to010", trkEta, isSignalVtx); }
+      else                { Fill(h, "trkVtxAssocPurity_TracksOfRecoVtxWithCorrectSimVtxMatch_trkEta_trkPt010toINF", trkEta, isSignalVtx); }
+    }
+
+    if(ntk > 0){
+      auto const purity = ntk_matched / float(ntk);
+      Fill(h, "trkVtxAssocPurity_vs_vz", v.z(), purity, isSignalVtx);
+      Fill(h, "trkVtxAssocPurity_vs_pu", npu, purity, isSignalVtx);
+    }
+
+    if(ntk_woFakeVtxs > 0){
+      auto const purity = ntk_matched / float(ntk_woFakeVtxs);
+      Fill(h, "trkVtxAssocPurityWithoutFakeRecoVtxs_vs_vz", v.z(), purity, isSignalVtx);
+      Fill(h, "trkVtxAssocPurityWithoutFakeRecoVtxs_vs_pu", npu, purity, isSignalVtx);
+    }
+  }
+}
 
 
 /***************************************************************************************/
@@ -9350,6 +9583,8 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       analyzeVertexComposition(h, v, tracks, simEvt, npu);
     }
   }
+
+  analyzeVertexTrackAssociation(h, vtxs, tracks, simEvt, npu);
 
   // unbiased track assignment efficiency
   // (unbiased in contrast to the conditional assignment efficiency where the existence of the rec vertex is required)
