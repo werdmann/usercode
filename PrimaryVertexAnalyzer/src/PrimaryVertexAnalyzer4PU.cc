@@ -6315,10 +6315,8 @@ bool PrimaryVertexAnalyzer4PU::truthMatchedTrack(const edm::RefToBase<reco::Trac
 {
   auto eta = track->eta(); // FIXME remove this line
   if (tp_r2s_->find(track) == tp_r2s_->end()) {
-    if(fabs(eta) > 3) {cout << "truthMatchedTrack.unmatched track eta " << eta << endl;} // FIXME remove this line
     return false;
   } else {
-    if(fabs(eta) > 2.5) {cout << "truthMatchedTrack.matched track eta " << eta << endl;} // FIXME remove this line
     double f = -1e10;
     TrackingParticleRef tf;
     std::vector<std::pair<TrackingParticleRef, double>> tp = (*tp_r2s_)[track];
