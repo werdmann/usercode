@@ -6313,7 +6313,6 @@ bool PrimaryVertexAnalyzer4PU::truthMatchedTrack(const edm::RefToBase<reco::Trac
 // after calling truthMatchedTrack, tpr may have changed its value
 // to get the TrackingParticle from the TrackingParticleRef, use ->get();
 {
-  auto eta = track->eta(); // FIXME remove this line
   if (tp_r2s_->find(track) == tp_r2s_->end()) {
     return false;
   } else {
