@@ -3082,13 +3082,14 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
     for (auto recv : *recVtxs_[label]) {
       if (recv.tracksSize() > 0){
 	for (trackit_t t = recv.tracks_begin(); t != recv.tracks_end(); t++) {
-          auto tk = tracks.from_key(t->key());
+          auto & tk = tracks.from_key(t->key()); // must be a reference in order to really update tracks[]
           const auto weight = recv.trackWeight(*t);
           assert(tk.key() == t->key());
           if( tk.get_recv(label) == NO_RECVTX ||  tk.get_weight(label) < weight){
             tk._recv[label] = iv;
             tk._weight[label] =  weight;
-            assert(tk.get_weight(label) == weight);
+            assert(tracks.from_key(t->key()).get_weight(label) == weight);
+            assert(tracks.from_key(t->key()).get_recv(label) == iv);
           }
 	}
       }
