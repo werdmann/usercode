@@ -1885,6 +1885,12 @@ private:
   edm::EDGetTokenT<edmNew::DetSetVector<SiPixelCluster> > pixelClusters_;
   bool l1garbled_;
 
+  // https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideHowToGetDataFromES
+  //edm::EDGetTokenT<edm::ESHandle<ParticleDataTable> > pdtToken_;
+  const edm::ESGetToken<HepPDT::ParticleDataTable, edm::DefaultRecord> pdtToken_;
+  const edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> transientTrackBuilderToken_;
+  const edm::ESGetToken<TrackerTopology, TrackerTopologyRcd> trackerTopologyToken_;
+
   static const int iX = 0;
   static const int iY = 1;
   static const int iZ = 2;

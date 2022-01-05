@@ -157,7 +157,6 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
       outputFile_(iConfig.getUntrackedParameter<std::string>("outputFile")),
       theTrackFilter(iConfig.getParameter<edm::ParameterSet>("TkFilterParameters")),
       recoTrackProducer_(iConfig.getUntrackedParameter<std::string>("recoTrackProducer")),
-      //vecPileupSummaryInfoToken_(consumes<std::vector<PileupSummaryInfo>>(edm::InputTag(std::string("addPileupInfo")))),
       vecPileupSummaryInfoToken_(consumes<std::vector<PileupSummaryInfo>>(edm::InputTag(std::string("slimmedAddPileupInfo")))),
       genParticleCollection_Token_(consumes<GenParticleCollection>(edm::InputTag(std::string("genParticles")))),
       recoTrackCollectionToken_(consumes<reco::TrackCollection>(
@@ -181,12 +180,12 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
           iConfig.getUntrackedParameter<edm::InputTag>("vertexAssociator"))),
       lumiDetailsToken_(consumes<LumiDetails, edm::InLumi>(edm::InputTag("lumiProducer"))),
       lumiSummaryToken_(consumes<LumiSummary, edm::InLumi>(edm::InputTag("lumiProducer"))),
-      lumiInfoToken_(consumes<LumiInfo>(iConfig.getUntrackedParameter<edm::InputTag>("lumiInfoTag")))
+      lumiInfoToken_(consumes<LumiInfo>(iConfig.getUntrackedParameter<edm::InputTag>("lumiInfoTag"))),
+      pdtToken_(esConsumes()),
+      transientTrackBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
+      trackerTopologyToken_(esConsumes())
 {
 
-  // just a test
-  auto tkf = iConfig.getParameter<edm::ParameterSet>("TkFilterParameters");
-  std::cout << "the track filter parameters " << tkf << std::endl;
   // v34 and higher, avoid biases
   minNumberOfRecTrks_ = 0.;  // FIXME make this configurable or maybe even better obsolete (are these empty BXs?)
   minNumberOfSelTrks_ = 0.;  // FIXME make this configurable
@@ -399,6 +398,8 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   const int nzbin_wide = 30;
   const int nzbin_wide_fine = 120;
   const float zrange_wide = 30.;
+  const float etarange = 4.;
+  const int netabin = 40.;
 
   //const int nzbin_normal = 30; until used
   const int nzbin_normal_fine = 60;
@@ -1847,8 +1848,9 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addnSP(h, new TH1F("nseltrkvtx", "#selected tracks", 200, 0., 200.));
     addnSP(h, new TH1F("zrecsim","zrec - zsim", 100, -0.4, 0.4));
     addnSP(h, new TH1F("zrecerr","zrec uncertainty", 100, 0.0, 0.01));
-    addnSP(h, new TH1F("zrecsimHR","zrec - zsim", 200, -0.02, 0.02));
+    addnSP(h, new TH1F("zrecsimHR","zrec - zsim", 400, -0.02, 0.02));
     addnSP(h, new TH1F("xrecsim","xrec - xsim", 100, -0.01, 0.01));
+    addnSP(h, new TH1F("xrecsimHR","xrec - xsim", 400, -0.01, 0.01));
     addnSP(h, new TH1F("xrecerr","xrec uncertainty", 100, 0.0, 0.01));
     addnSP(h, new TH1F("yrecsim","yrec - ysim", 100, -0.01, 0.01));
     addnSP(h, new TH1F("yrecerr","yrec uncertainty", 100, 0.0, 0.01));
@@ -1957,11 +1959,11 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
       addn(h, new TH1F("tpulltrk", "track--vertex pull", 200, -10., 10.));
     }
     addn(h, new TH1F("phi", "phi", 80, -3.14159, 3.14159));
-    addn(h, new TH1F("eta", "eta ", 80, -4., 4.));
+    addn(h, new TH1F("eta", "eta ", netabin, -etarange, etarange));
     addn(h, new TH1F("pt", "pt ", 100, 0., 5.));
     addn(h, new TH1F("logpt", "logpt ", 60, -1., 5.));
-    addn(h, new TH2F("logpteta", "logpt vs eta ", 80, -4., 4., 60, -1., 5.));
-    addn(h, new TH2F("z-eta", "z vs eta ", 48, -2.4, 2.4, 60, -15., 15.));
+    addn(h, new TH2F("logpteta", "logpt vs eta ", netabin, -etarange, etarange, 60, -1., 5.));
+    addn(h, new TH2F("z-eta", "z vs eta ", netabin, -etarange, etarange, 60, -15., 15.));
     addn(h, new TH2F("z-pt", "pt vs z", 60, -15., 15., 100, 0., 5.));
     addn(h, new TH2F("z-logpt", "log pt vs z", 60, -15., 15., 60, -1., 5.));
     addn(h, new TH1F("ptfwd", "pt (forward)", 100, 0., 5.));
@@ -1978,12 +1980,10 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addn(h, new TH1F("logtresz", "log10(track z resolution/um)", 100, 0., 5.));
     addn(h, new TH1F("tpullxy", "track r-phi pull", 100, -10., 10.));
     addn(h, new TProfile("tpullxyvsz", "track r-phi pull", 120, -30., 30., -10., 10.));
-    //addn(h, new TProfile("tpullxyvseta", "track r-phi pull", 48, -2.4, 2.4, -10., 10.));
-    addn(h, new TProfile("tpullxyvseta", "track r-phi pull", 80, -4.0, 4.0, -10., 10.));
+    addn(h, new TProfile("tpullxyvseta", "track r-phi pull", netabin, -etarange, etarange, -10., 10.));
     addn(h, new TProfile("tpullzvsz", "track z pull", 120, -30., 30., -10., 10.));
-    //addn(h, new TProfile("tpullzvseta", "track z pull", 48, 2.4, 2.4, -10., 10.));
-    addn(h, new TProfile("tpullzvseta", "track z pull", 80, 4.0, 4.0, -10., 10.));
-    addn(h, new TH2F("lvseta", "cluster length vs eta", 80, -4., 4., 20, 0., 20));
+    addn(h, new TProfile("tpullzvseta", "track z pull", netabin, -etarange, etarange, -10., 10.));
+    addn(h, new TH2F("lvseta", "cluster length vs eta", netabin, -etarange, etarange, 20, 0., 20));
     addn(h, new TH2F("lvstanlambda", "cluster length vs tan lambda", 60, -6., 6., 20, 0., 20));
     addn(h, new TH1F("longestbarrelhit", "longest barrel cluster", 40, 0., 40.));
     // note : histograms involving the relation wrt a rec vertex are usually filled with the tagged vertex
@@ -1992,7 +1992,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addn(h, new TH1D("zrestrk", "z-residuals (track vs vertex)", 200, -2., 2.));
     addn(h,
         new TH2F("zrestrkvsphi", "z-residuals (track - vertex)", 12, -3.14159, 3.14159, 100, -1., 1.));
-    addn(h, new TH2F("zrestrkvseta", "z-residuals (track - vertex)", 16, -4., 4., 100, -1., 1.));
+    addn(h, new TH2F("zrestrkvseta", "z-residuals (track - vertex)", 16, -etarange, etarange, 100, -1., 1.));
     addn(h, new TH2F("zrestrkvsz", "z-residuals (track - vertex) vs z", 100, -20., 20., 100, -1., 1.));
     addn(h,
         new TH2F("zpulltrkvsphi",
@@ -2005,7 +2005,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
                  5.));
     addn(h,
         new TH2F(
-            "zpulltrkvseta", "normalized z-residuals (track - vertex)", 12, -3., 3., 100, -5., 5.));
+            "zpulltrkvseta", "normalized z-residuals (track - vertex)", 12, -etarange, etarange, 100, -5., 5.));
     addn(h,
         new TH2F(
             "zpulltrkvsz", "normalized z-residuals (track - vertex) vs z", 100, -20., 20., 100, -5., 5.));
@@ -2030,26 +2030,26 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     //  - tracks with MC truth (matched to TrackingParticles)
     addnSP(h, new TH1D("tkzrecsim", "zrec-zsim", 200, -0.1, 0.1));
     addnSP(h, new TH1D("tkzrecsimpull", "(zrec-zsim) / #sigma_{z}", 300, -15., 15.));
-    addnSP(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", 100, -4., 4., 0., 1000.));
-    addnSP(h, new TH2F("tkzrecsimpullvseta", "zrec-zsim pull vs eta", 100, -4., 4., 200, -20., 20.));
+    addnSP(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", netabin, -etarange, etarange, 0., 1000.));
+    addnSP(h, new TH2F("tkzrecsimpullvseta", "zrec-zsim pull vs eta", netabin, -etarange, etarange, 200, -20., 20.));
     addnSP(h, new TProfile("tkzrecsimvsz",   "zrec-zsim vs z", 100, -15., 15., -1000., 1000.));
-    addnSP(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", 100, -4., 4., -1000., 1000.));
-    addnSP(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", 100, -4., 4., -1000., 1000.));
-    addnSP(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", 40, -2., 2., 200, -4., 4.));
+    addnSP(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", netabin, -etarange, etarange, -1000., 1000.));
+    addnSP(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", netabin, -etarange, etarange, -1000., 1000.));
+    addnSP(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", netabin, -etarange, etarange, 200, -4., 4.));
 
-    addnSP(h, new TH2F("tkptrecsimrelvssimeta2d", "(pTrec-pTsim)/pTrec vs eta_{TP}", 100, -5., 5., 300, -0.3, 0.3));
-    addnSP(h, new TH2F("tkptrecsimpullvssimeta2d", "pTrec-pTsim pull vs eta_{TP}", 100, -5., 5., 100, -15., 15.));
-    addnSP(h, new TH2F("tketarecsimvssimeta2d", "etarec-etasim vs eta_{TP}", 100, -5., 5., 100, -0.05, 0.05));
-    addnSP(h, new TH2F("tkphirecsimvssimeta2d", "phirec-phisim vs eta_{TP}", 100, -5., 5., 100, -0.05, 0.05));
-    addnSP(h, new TH2F("tkzrecsimvssimeta2d", "zrec-zsim vs eta_{TP}", 100, -5., 5., 200, -0.2, 0.2));
-    addnSP(h, new TH2F("tkzrecsimpullvssimeta2d" , "zrec-zsim pull vs eta_{TP}", 100, -5., 5., 300, -15., 15.));
+    addnSP(h, new TH2F("tkptrecsimrelvssimeta2d", "(pTrec-pTsim)/pTrec vs eta_{TP}", netabin, -etarange, etarange, 300, -0.3, 0.3));
+    addnSP(h, new TH2F("tkptrecsimpullvssimeta2d", "pTrec-pTsim pull vs eta_{TP}", netabin, -etarange, etarange, 100, -15., 15.));
+    addnSP(h, new TH2F("tketarecsimvssimeta2d", "etarec-etasim vs eta_{TP}", netabin, -etarange, etarange, 100, -0.05, 0.05));
+    addnSP(h, new TH2F("tkphirecsimvssimeta2d", "phirec-phisim vs eta_{TP}", netabin, -etarange, etarange, 100, -0.05, 0.05));
+    addnSP(h, new TH2F("tkzrecsimvssimeta2d", "zrec-zsim vs eta_{TP}", netabin, -etarange, etarange, 200, -0.2, 0.2));
+    addnSP(h, new TH2F("tkzrecsimpullvssimeta2d" , "zrec-zsim pull vs eta_{TP}", netabin, -etarange, etarange, 300, -15., 15.));
 
     addnSP(h, new TH1D("tktrecsim", "trec-tsim", 200, -0.3, 0.3));
     addnSP(h, new TH1D("tktrecsimpull", "(trec-tsim)/terr", 200, -10., 10.));
     addnSP(h, new TH1D("tktrecsim_pid", "trec-tsim (pid)", 200, -0.3, 0.3));
     addnSP(h, new TH1D("tktrecsimpull_pid", "(trec-tsim)/terr (pid)", 200, -10., 10.));
     addnSP(h, new TH1D("tktrecsimpullwide", "trec-tsim", 200, -20., 20.));
-    addnSP(h, new TH2F("tktrecsimvseta2d", "trec-tsim vs eta", 40, -4., 4., 200, -1.0, 1.0));
+    addnSP(h, new TH2F("tktrecsimvseta2d", "trec-tsim vs eta", netabin, -etarange, etarange, 200, -1.0, 1.0));
     addnSP(h, new TProfile("tktrecsimpullsqvserr", "((trec-tsim)/terr)**2 vs terr", 50, 0., 0.5, 0., 100.0));
     addnSP(h, new TH2F("tktrecsimpullvserr", "(trec-tsim)/terr vs terr", 50, 0., 0.5, 50, 0., 100.0));
     addnSP(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -1000., 1000.));
@@ -2507,20 +2507,20 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   add(h, new TH1F("unmatchedVtxNdof", "ndof of unmatched rec vertices (fakes)", 500, 0., 100.));
   add(h, new TH1F("unmatchedVtxNdof1", "ndof of unmatched rec vertices (fakes, delta z>1cm)", 500, 0., 100.));
   add(h, new TH1F("unmatchedVtxNdof2", "ndof of unmatched rec vertices (fakes, delta z>2cm)", 500, 0., 100.));
-  add(h, new TH2F("correctlyassigned", "pt and eta of correctly assigned tracks", 80, -4., 4., 100, 0, 10.));
-  add(h, new TH2F("misassigned", "pt and eta of mis assigned tracks", 80, -4., 4., 100, 0, 10.));
-  add(h, new TH2F("correctlyassignedlogpt", "log10 pt and eta of correctly assigned tracks", 80, -4., 4., 40, -1., 3.));
-  add(h, new TH2F("misassignedlogpt", "log10 pt and eta of mis assigned tracks", 80, -3., 4., 40, -1., 3.));
+  add(h, new TH2F("correctlyassigned", "pt and eta of correctly assigned tracks", netabin, -etarange, etarange, 100, 0, 10.));
+  add(h, new TH2F("misassigned", "pt and eta of mis assigned tracks", netabin, -etarange, etarange, 100, 0, 10.));
+  add(h, new TH2F("correctlyassignedlogpt", "log10 pt and eta of correctly assigned tracks", netabin, -etarange, etarange, 40, -1., 3.));
+  add(h, new TH2F("misassignedlogpt", "log10 pt and eta of mis assigned tracks", netabin, -etarange, etarange, 40, -1., 3.));
 
   add(h, new TH1F("ptcat", "pt of correctly assigned tracks", 100, 0, 10.));
-  add(h, new TH1F("etacat", "eta of correctly assigned tracks", 80, -4., 4.));
-  add(h, new TH1F("etacatpt2", "eta of correctly assigned tracks pt>2GeV", 80, -4., 4.));
+  add(h, new TH1F("etacat", "eta of correctly assigned tracks", netabin, -etarange, etarange));
+  add(h, new TH1F("etacatpt2", "eta of correctly assigned tracks pt>2GeV", netabin, -etarange, etarange));
   add(h, new TH1F("phicat", "phi of correctly assigned tracks", 100, -3.14159, 3.14159));
   add(h, new TH1F("dzcat", "dz of correctly assigned tracks", 100, 0., 1.));
 
   add(h, new TH1F("ptmis", "pt of mis-assigned tracks", 100, 0, 10.));
-  add(h, new TH1F("etamis", "eta of mis-assigned tracks", 80, -4., 4.));
-  add(h, new TH1F("etamispt2", "eta mis-correctly assigned tracks pt>2GeV", 80, -4., 4.));
+  add(h, new TH1F("etamis", "eta of mis-assigned tracks", netabin, -etarange, etarange));
+  add(h, new TH1F("etamispt2", "eta mis-correctly assigned tracks pt>2GeV", netabin, -etarange, etarange));
   add(h, new TH1F("phimis", "phi of mis-assigned tracks", 100, -3.14159, 3.14159));
   add(h, new TH1F("dzmis", "dz of mis-assigned tracks", 100, 0., 1.));
 
@@ -2600,6 +2600,9 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
 // book histograms for truth-matched tracks,
 // filled in analyzeTracksTP
 {
+  const float etarange = 4.;
+  const int netabin = 40.;
+
   rootFile_->cd();
   TDirectory* dir = rootFile_->mkdir(directory_name);
   dir->cd();
@@ -2614,26 +2617,26 @@ void PrimaryVertexAnalyzer4PU::bookTrackHistograms(const char * directory_name)
           "zpulltrkt_primselmatched", "reconstructed z- generated z for primary tracks with timing", 200, -10., 10.));
   add(hTrk, new TH1F("zpulltprimsel", "reconstructed z- generated z for primary tracks with timing", 200, -10., 10.));
   add(hTrk, new TH1F("zrestrk_primselmatched", "reconstructed z- generated z for primary tracks", 200, -0.2, 0.2));
-  add(hTrk, new TH2F("zpulltprimselvseta", "", 80, -4.0, 4.0, 200, -10., 10.));
+  add(hTrk, new TH2F("zpulltprimselvseta", "", netabin, -etarange, etarange, 200, -10., 10.));
 
 
   //>>>>>>>>>>>>>>>>>
   for(auto bin = 0u; bin < trkdzbin_.size(); bin++){
-    add(hTrk, new TH2F(Form("zpulltprimselvseta_%s", trkdzbin_[bin].c_str()), "", 48, -2.4, 2.4, 200, -10., 10.));
-    add(hTrk, new TH2F(Form("zpulltprimselbpxlt2vseta_%s", trkdzbin_[bin].c_str()), "", 48, -2.4, 2.4, 200, -10., 10.));
-    add(hTrk, new TH2F(Form("zpulltprimselbpxgt2vseta_%s", trkdzbin_[bin].c_str()), "", 48, -2.4, 2.4, 200, -10., 10.));
+    add(hTrk, new TH2F(Form("zpulltprimselvseta_%s", trkdzbin_[bin].c_str()), "", netabin, -etarange, etarange, 200, -10., 10.));
+    add(hTrk, new TH2F(Form("zpulltprimselbpxlt2vseta_%s", trkdzbin_[bin].c_str()), "", netabin, -etarange, etarange, 200, -10., 10.));
+    add(hTrk, new TH2F(Form("zpulltprimselbpxgt2vseta_%s", trkdzbin_[bin].c_str()), "", netabin, -etarange, etarange, 200, -10., 10.));
     add(hTrk, new TH2F(Form("zpulltprimselvslogpt_%s", trkdzbin_[bin].c_str()), "", 40, -1., 3., 200, -10., 10.));
     add(hTrk, new TProfile(Form("ztailtprimselvslogpt_%s",trkdzbin_[bin].c_str()) , "", 40, -1., 3., 0., 2.));
     add(hTrk, new TProfile(Form("ztailtprimselvslogpt_etahi_%s",trkdzbin_[bin].c_str()) , "", 40, -1., 3., 0., 2.));
     add(hTrk, new TProfile(Form("ztailtprimselvslogpt_etalo_%s",trkdzbin_[bin].c_str()) , "", 40, -1., 3., 0., 2.));
-    add(hTrk, new TH2F(Form("ztailtprimselvslogpteta_%s", trkdzbin_[bin].c_str()), "", 48, -2.4, 2.4, 40, -1., 3.));
-    add(hTrk, new TH2F(Form("tprimselvslogpteta_%s", trkdzbin_[bin].c_str()), "", 48, -2.4, 2.4, 40, -1., 3.));
+    add(hTrk, new TH2F(Form("ztailtprimselvslogpteta_%s", trkdzbin_[bin].c_str()), "", netabin, -etarange, etarange, 40, -1., 3.));
+    add(hTrk, new TH2F(Form("tprimselvslogpteta_%s", trkdzbin_[bin].c_str()), "", netabin, -etarange, etarange, 40, -1., 3.));
   }
 
   add(hTrk, new TH2F("zpulltprimselvslogpt", "", 40, -1., 3., 200, -10., 10.));
 
-  add(hTrk, new TH2F("ztailtprimselvslogpteta", "", 80, -4.0, 4.0, 40, -1., 3.));
-  add(hTrk, new TH2F("tprimselvslogpteta", "", 80, -4.0, 4.0, 40, -1., 3.));
+  add(hTrk, new TH2F("ztailtprimselvslogpteta", "", netabin, -etarange, etarange, 40, -1., 3.));
+  add(hTrk, new TH2F("tprimselvslogpteta", "", netabin, -etarange, etarange, 40, -1., 3.));
   //<<<<<<<<<<<<<<<<<<<<<<<<
 
   add(hTrk,
@@ -2853,7 +2856,8 @@ void PrimaryVertexAnalyzer4PU::get_luminosity_infos(const edm::Event& iEvent) {
 
 void PrimaryVertexAnalyzer4PU::get_particle_data_table(const edm::EventSetup& iSetup) {
   try {
-    iSetup.getData(pdt_);
+    //iSetup.getData(pdt_);
+    pdt_ = iSetup.getHandle(pdtToken_);
   } catch (const Exception&) {
     std::cout << "Some problem occurred with the particle data table. This may not work !" << std::endl;
   }
@@ -3071,7 +3075,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
 
     tracks.push_back(tk);
   }
-  
+
   // set-up the reco  track --> vertex pointers
 
   for (auto label : vertexCollectionLabels_) {
@@ -3082,7 +3086,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
     for (auto recv : *recVtxs_[label]) {
       if (recv.tracksSize() > 0){
 	for (trackit_t t = recv.tracks_begin(); t != recv.tracks_end(); t++) {
-          auto & tk = tracks.from_key(t->key()); // must be a reference in order to really update tracks[]
+          auto & tk = tracks.from_key(t->key());
           const auto weight = recv.trackWeight(*t);
           assert(tk.key() == t->key());
           if( tk.get_recv(label) == NO_RECVTX ||  tk.get_weight(label) < weight){
@@ -3096,7 +3100,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
       iv++;
     }
   }
-
+  
   if (recTrks->size() < minNumberOfRecTrks_) {
     emptyeventcounter_++;
     if (emptyeventcounter_ < 100) {
@@ -3222,7 +3226,6 @@ bool PrimaryVertexAnalyzer4PU::get_MC_truth(const edm::Event& iEvent,
       iEvent.getByToken(recoToSimAssociationToken_, recoToSimH);
       tp_r2s_ = recoToSimH.product();
       tracking_truth_available_ = true;
-  
       simEvt = getSimEvents_tp(TPCollectionH, tracks);
       analyzeTracksTP(tracks, simEvt);
     }
@@ -5027,6 +5030,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
   Fill(h, vtype + "/xrecerr", v.xError(), simevt.is_signal());  // like xerr but separated by signal/pu
   Fill(h, vtype + "/yrecerr", v.yError(), simevt.is_signal());
   Fill(h, vtype + "/zrecerr", v.zError(), simevt.is_signal());
+  Fill(h, vtype + "/xrecsimHR", v.x() - xsim, simevt.is_signal());
   Fill(h, vtype + "/zrecsimHR", v.z() - zsim, simevt.is_signal());
   Fill(h, vtype + "/xrecsimpull", (v.x() - xsim) / v.xError(), simevt.is_signal());
   Fill(h, vtype + "/yrecsimpull", (v.y() - ysim) / v.yError(), simevt.is_signal());
@@ -6821,8 +6825,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   }
 
   //Retrieve tracker topology from geometry, need for track cluster infos
-  edm::ESHandle<TrackerTopology> tTopoH;
-  iSetup.get<TrackerTopologyRcd>().get(tTopoH);
+  auto const & tTopoH = iSetup.getHandle(trackerTopologyToken_);
   tTopo_ = tTopoH.product();
 
   if (!do_vertex_analysis_)
@@ -6882,7 +6885,8 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   Tracks tracks;
   
   //  get transient track builder and b-field
-  iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", theB_);
+  //iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", theB_);
+  theB_ = iSetup.getHandle(transientTrackBuilderToken_);
   fBfield_ = ((*theB_).field()->inTesla(GlobalPoint(0., 0., 0.))).z();
 
 
@@ -6910,7 +6914,6 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   }
 
 
-  
   // collect MC information
   std::vector<SimEvent> simEvt;
   if (run_ < 1000) {
@@ -6963,7 +6966,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
     vertexes_[label] = MVertexCollection(label, recVtxs_[label], tracks);
     auto & vertexes = vertexes_[label];
     auto & histos = histograms_[label];
-    
+
     // replace by set_ndof_globals(label);
     if (label.find("WithBS") !=std::string::npos){
       selNdof_ = selNdofWithBS_;
@@ -9308,7 +9311,10 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
     if (vtxs(iv).is_real()) {
       fillVertexHistosMatched(h, "matchedvtx", vtxs.at(iv), tracks, simEvt);
     }
-
+    if (vtxs[iv].is_real() && select(vtxs(iv))) {
+      fillVertexHistosMatched(h, "matchedvtxsel", vtxs.at(iv), tracks, simEvt);
+    }
+    
     if (vtxs[iv].is_fake()) {
       ntpfake++;
       if (vtxs(iv).ndof() > 4) {
