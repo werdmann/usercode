@@ -9222,6 +9222,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       if (vtxs[iv].is_real()) {
         ntprealsel++;
 	fillVertexHistosMatched(h, "matchedvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
+    
 	if(vtxs[iv].is_signal()){
 	  fillVertexHistosMatched(h, "matchedsignalvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
 	  for( auto tv : vtxs(iv).tracks){
@@ -9309,12 +9310,10 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
     }
 
     if (vtxs(iv).is_real()) {
+      // matched, but not necessarily selected, note that matched and selected are filled above
       fillVertexHistosMatched(h, "matchedvtx", vtxs.at(iv), tracks, simEvt);
     }
-    if (vtxs[iv].is_real() && select(vtxs(iv))) {
-      fillVertexHistosMatched(h, "matchedvtxsel", vtxs.at(iv), tracks, simEvt);
-    }
-    
+
     if (vtxs[iv].is_fake()) {
       ntpfake++;
       if (vtxs(iv).ndof() > 4) {
