@@ -2039,10 +2039,12 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
 
     addnSP(h, new TH2F("tkptrecsimrelvssimeta2d", "(pTrec-pTsim)/pTrec vs eta_{TP}", netabin, -etarange, etarange, 300, -0.3, 0.3));
     addnSP(h, new TH2F("tkptrecsimpullvssimeta2d", "pTrec-pTsim pull vs eta_{TP}", netabin, -etarange, etarange, 100, -15., 15.));
+    addnSP(h, new TH2F("tkdptrelrecvssimeta2d", "#sigma(pTrec)/pTrec vs eta_{TP}", netabin, -etarange, etarange, 100, -3., 3.));
     addnSP(h, new TH2F("tketarecsimvssimeta2d", "etarec-etasim vs eta_{TP}", netabin, -etarange, etarange, 100, -0.05, 0.05));
     addnSP(h, new TH2F("tkphirecsimvssimeta2d", "phirec-phisim vs eta_{TP}", netabin, -etarange, etarange, 100, -0.05, 0.05));
     addnSP(h, new TH2F("tkzrecsimvssimeta2d", "zrec-zsim vs eta_{TP}", netabin, -etarange, etarange, 200, -0.2, 0.2));
     addnSP(h, new TH2F("tkzrecsimpullvssimeta2d" , "zrec-zsim pull vs eta_{TP}", netabin, -etarange, etarange, 300, -15., 15.));
+    addnSP(h, new TH2F("tkdzrecvssimeta2d", "zError vs eta_{TP}", netabin, -etarange, etarange, 200, -0.2, 0.2));
 
     addnSP(h, new TH1D("tktrecsim", "trec-tsim", 200, -0.3, 0.3));
     addnSP(h, new TH1D("tktrecsimpull", "(trec-tsim)/terr", 200, -10., 10.));
@@ -4244,6 +4246,14 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
   double wsum = 0;
   double w2sum = 0;
 
+  if(verbose) {
+    cout << "vertex_time_from_tracks_pid vtx x=" << v.x()
+	 << " y=" << v.y()
+	 << " z=" << v.z()
+	 << " t=" << v.t()
+         << endl;
+  }
+
   //double a[3] = {0.333333333,0.33333333,0.333333333};
   double a[3] = {0.7,0.2,0.1};
   constexpr double cooling_factor = 0.5;
@@ -4257,11 +4267,19 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	for(unsigned int j=0; j < 3; j++){
 	  tsum += w * trk.th[j] * a[j];
 	}
+
+	if(verbose){
+          cout << "vertex_time_from_tracks_pid:     track"
+               << " pt=" << trk.pt() << " eta=" << trk.eta() << " phi=" << trk.phi() << " t=" << trk.t()
+               << " vtxWeight=" << v.trackWeight(*tk) << " time=" << trk.MTD_time() << " timeError=" << trk.MTD_timeerror()
+               << " timeQuality=" << trk.timeQuality() << " pathLength=" << trk.MTD_pathlength() << " momentum=" << trk.MTD_momentum()
+               << " timeHyp[pion]=" << trk.th[0] << " timeHyp[kaon]=" << trk.th[1]
+               << " timeHyp[proton]=" << trk.th[2] << endl;
+        }
       }
     }
   }
 
-  
   if (wsum > 0) {
 
     if(verbose) {
@@ -4334,17 +4352,17 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 		      e[j] = exp(- 0.5 * beta * tpull * tpull);
 		      Z += a[j] * e[j];
 		    }
-		    cout << "    " << fixed << setw(7) << setprecision(3) << trk.t() 
-			 << "+/-" << fixed << setw(6) << setprecision(3) << dt;
+		    cout << "    " << fixed << setw(7) << setprecision(7) << trk.t() 
+			 << "+/-" << fixed << setw(6) << setprecision(7) << dt;
 		    for(unsigned int j = 0; j < 3; j++){
 		      double wt = a[j] * e[j] / Z;
 		      cout << "  [" <<  fixed << setw(1) << j << "]  " 
-			   << fixed << setw(7) << setprecision(3) << trk.th[j] << "ns  " 
+			   << fixed << setw(7) << setprecision(7) << trk.th[j] << "ns  " 
 			   << fixed << setw(7) << setprecision(5) << wt;  
 		    }
 		    if(trk.matched()) {
-		      cout << "   m " << fixed << setw(8) << setprecision(3) << trk.get_t_pid()
-			   << " gen " << fixed << setw(8) << setprecision(3) << trk.tsim();
+		      cout << "   m " << fixed << setw(8) << setprecision(7) << trk.get_t_pid()
+			   << " gen " << fixed << setw(8) << setprecision(7) << trk.tsim();
 		    }
 		    cout << endl;
 		  }
@@ -4535,17 +4553,17 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton(const reco::Ve
 		      e[j] = exp(- 0.5 * beta * tpull * tpull);
 		      Z += a[j] * e[j];
 		    }
-		    cout << "    " << fixed << setw(7) << setprecision(3) << trk.t() 
-			 << "+/-" << fixed << setw(6) << setprecision(3) << dt;
+		    cout << "    " << fixed << setw(7) << setprecision(7) << trk.t() 
+			 << "+/-" << fixed << setw(6) << setprecision(7) << dt;
 		    for(unsigned int j = 0; j < 3; j++){
 		      double wt = a[j] * e[j] / Z;
 		      cout << "  [" <<  fixed << setw(1) << j << "]  " 
-			   << fixed << setw(7) << setprecision(3) << trk.th[j] << "ns  " 
+			   << fixed << setw(7) << setprecision(7) << trk.th[j] << "ns  " 
 			   << fixed << setw(7) << setprecision(5) << wt;  
 		    }
 		    if(trk.matched()) {
-		      cout << "   m " << fixed << setw(8) << setprecision(3) << trk.get_t_pid()
-			   << " gen " << fixed << setw(8) << setprecision(3) << trk.tsim();
+		      cout << "   m " << fixed << setw(8) << setprecision(7) << trk.get_t_pid()
+			   << " gen " << fixed << setw(8) << setprecision(7) << trk.tsim();
 		    }
 		    cout << endl;
 		  }
@@ -5318,6 +5336,8 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
   auto const isSignalPV = (tk._simEvt->index == 0);
 
   auto const rec_pt = tk.pt();
+  auto const rec_dpt = tk.ptError();
+  auto const rec_dptrel = rec_dpt/rec_pt;
   auto const rec_eta = tk.eta();
   auto const rec_phi = tk.phi();
   auto const rec_z = tk.z();
@@ -5330,7 +5350,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
 
   auto const dptDiff = (rec_pt - sim_pt);
   auto const dptDiffRel = dptDiff/rec_pt;
-  auto const dptPull = dptDiff/tk.ptError();
+  auto const dptPull = dptDiff/rec_dpt;
   auto const detaDiff = (rec_eta - sim_eta);
   auto const dphiDiff = reco::deltaPhi(rec_phi, sim_phi);
 
@@ -5349,10 +5369,12 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
 
   Fill(h, ttype + "/tkptrecsimrelvssimeta2d", sim_eta, dptDiffRel, isSignalPV);
   Fill(h, ttype + "/tkptrecsimpullvssimeta2d", sim_eta, dptPull, isSignalPV);
+  Fill(h, ttype + "/tkdptrelrecvssimeta2d", sim_eta, rec_dptrel, isSignalPV);
   Fill(h, ttype + "/tketarecsimvssimeta2d", sim_eta, detaDiff, isSignalPV);
   Fill(h, ttype + "/tkphirecsimvssimeta2d", sim_eta, dphiDiff, isSignalPV);
   Fill(h, ttype + "/tkzrecsimvssimeta2d", sim_eta, dzDiff, isSignalPV);
   Fill(h, ttype + "/tkzrecsimpullvssimeta2d", sim_eta, dzPull, isSignalPV);
+  Fill(h, ttype + "/tkdzrecvssimeta2d", sim_eta, rec_dz, isSignalPV);
 
   if (f4D_ and tk.has_timing()){
 
