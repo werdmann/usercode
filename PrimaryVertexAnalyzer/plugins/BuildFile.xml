@@ -1,0 +1,9 @@
+<library name="usercodePrimaryVertexAnalyzerPlugins" file="*.cc">
+  <flags EDM_PLUGIN="1"/>
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/ParameterSet"/>
+  <use name="FWCore/MessageLogger"/>
+  <use name="CommonTools/Utils"/>
+  <use name="CommonTools/UtilAlgos"/>
+  <use name="DataFormats/VertexReco"/>
+</library>
