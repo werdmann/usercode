@@ -1009,9 +1009,8 @@ public:
     }
 
      // returns the weight of the associated MVertex in it's collection
-    double get_weight(std::string& vtxcollection) const  {
+    double get_weight(const std::string& vtxcollection) const  {
       if (_recv.find(vtxcollection) == _recv.end()) {
-	std::cout << "MTrack.getweight failed to find " << vtxcollection << "   in " << _recv.size() << std::endl;
         return 0.;
       } else {
         return _weight.at(vtxcollection);
@@ -1576,11 +1575,6 @@ private:
                                            const reco::VertexCollection* recVtxs,
                                            const std::string message = "");
 
-  void analyzeVertexCollectionReco_obsolete(std::map<std::string, TH1*>& h,
-                                   const reco::VertexCollection* recVtxs,
-                                   Tracks& tracks,
-                                   const std::string message = "");
-
   void analyzeVertexCollectionReco(std::map<std::string, TH1*>& h,
                                    MVertexCollection& recVtxs,
                                    Tracks& tracks,  // do I even need this?
@@ -1905,6 +1899,9 @@ private:
   double selNdofWithBS_;
   double selNdofNoBS_;
   double ndof0trk_;
+  double trkcentraletamax_;
+  double trkloptmax_;
+  double trkhiptmin_;
 
   static const int nzbins_ = 40;
   double zbinmax_;

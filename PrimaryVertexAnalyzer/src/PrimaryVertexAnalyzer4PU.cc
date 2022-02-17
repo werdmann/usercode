@@ -328,6 +328,9 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
     cout << endl;
   }
 
+  trkhiptmin_ = 3.0;
+  trkloptmax_ = 1.0;
+  trkcentraletamax_ = 1.5;
   trackAssociatorMin_ = 0.5;
 
   /* initialize counters */
@@ -478,19 +481,10 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   addSP(h, new TH1F("pully", "pull y", 100, -25., 25.));
   addSP(h, new TH1F("pullz", "pull z", 100, -25., 25.));
 
-  add(h, new TH1F("vtxcxy2", "xy-beam compatibility", 100, 0., 50.));
-  add(h, new TH1F("vtxcxy2Matched", "xy-beam compatibility", 100, 0., 50.));
-  add(h, new TH1F("vtxprobxyMatched", "xy-beam compatibility", 100, 0., 1.));
-  add(h, new TH1F("vtxcxy2Fake", "xy-beam compatibility", 100, 0., 50.));
-  add(h, new TH1F("vtxprobxyFake", "xy-beam compatibility", 100, 0., 1.));
-  add(h, new TH1F("ntpfake0", "fake vertices", 20, 0., 20.));
-  add(h, new TH1F("ntpfake4", "fake vertices with ndof>4", 20, 0., 20.));
-  add(h, new TH1F("ndofFake", "ndof of fake vertices", 500, 0., 100.));
-  add(h, new TH1F("logndofFake", "log10(ndof) of fake vertices", 500, -1., 10.));
-  add(h, new TH1F("ndofMatched", "ndof of matched vertices", 500, 0., 100.));
-
-  add(h, new TH1F("ntpfound0", "found vertices", 300, 0., 300.));
-  add(h, new TH1F("ntpfound4", "found vertices with ndof>4", 300, 0., 300.));
+  add(h, new TH1F("ntpreal", "found vertices", 300, 0., 300.));
+  add(h, new TH1F("ntprealsel", "found selected vertices", 300, 0., 300.));
+  add(h, new TH1F("ntpfake", "found vertices", 300, 0., 300.));
+  add(h, new TH1F("ntpfakesel", "found vertices", 300, 0., 300.));
 
   add(h, new TH1F("indexempty", "index of the empty vertex", 200, 0., 200.));
   add(h, new TH1F("trksumpt2rank_signal", "track sumpt2 ranking signal", 200, 0. ,200.));
@@ -653,8 +647,8 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   add(h, new TH1F("ndofsignalsplitSimpv", "ndof of vertices split from the signal vertex", 100, 0., 20.));
   add(h, new TH1F("ndofpxysignalsplitSimpv", "ndof of vertices split from the signal vertex", 100, 0., 20.));
 
-  add(h, new TProfile("ntpfake4prof", "fake vertices with ndof>4", 20, 0., 100., 0., 200.));
-  add(h, new TProfile("ntpfound4prof", "found vertices with ndof>4", 20, 0., 100., 0., 200.));
+  add(h, new TProfile("ntpfakeselprof", "selected fake vertices", 30, 0., 300., 0., 300.));
+  add(h, new TProfile("ntprealselprof", "selected real vertices", 30, 0., 300., 0., 300.));
 
   add(h, new TProfile("ntpselvssimPU", "selected vertices", nvtxbin, 0., nvtxrange, 0., nvtxrange * 2.));
   add(h, new TProfile("ntpfakeselvssimPU", "fake selected vertices", nvtxbin, 0., nvtxrange, 0., nvtxrange * 2.));
@@ -1767,17 +1761,11 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
                            "tagged",
 			   "matchedvtx",
 			   "matchedvtxsel",
+			   "fakevtxsel",
 			   "splitvtxsel",
 			   "otherfakevtxsel",
 			   "splitvtxselfromsignal",
-			   "splitvtxselfrompu",
-			   "matchedsignalvtxsel",
-			   "matchedpuvtxsel",
-                           //"hipu",
-                           //"tail",
-                           //"tailzgt1",
-                           "sel"
-                           //"selzgt1"
+			   "splitvtxselfrompu"
   };
   unsigned int nvtype = vtypes.size();
   for (unsigned int t = 0; t < nvtype; t++) {
@@ -1875,6 +1863,9 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
       addnSP(h, new TH1F("trecsim_fromtracks", "vertex time residual from tracks", 200, -0.1, 0.1));
       addnSP(h, new TH1F("trecerr_fromtracks", "vertex time error from tracks", 500, 0., 0.1));
       addnSP(h, new TH1F("trecsimpull_fromtracks", "tpull from tracks", 200, -10., 10.));
+      addnSP(h, new TH1F("trecsim_fromtracks_qual", "vertex time residual from tracks with quality", 200, -0.1, 0.1));
+      addnSP(h, new TH1F("trecerr_fromtracks_qual", "vertex time error from tracks with quality", 500, 0., 0.1));
+      addnSP(h, new TH1F("trecsimpull_fromtracks_qual", "tpull from tracks with quality", 200, -10., 10.));
       addnSP(h, new TH1F("trecsim_fromtracks_pid", "vertex time residual from tracks (pid)", 200, -0.1, 0.1));
       addnSP(h, new TH1F("trecerr_fromtracks_pid", "vertex time error from tracks (pid)", 500, 0., 0.1));
       addnSP(h, new TH1F("trecsimpull_fromtracks_pid", "tpull from tracks (pid)", 200, -10., 10.));
@@ -1914,13 +1905,16 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   vector<string> ttypes = {"trkall",
                            "trksel",
                            "sellost",
-                           "wgt05",
-                           "wlt05",
+                           "selused",
                            "trkselhipt",
                            "trkselhiptfwd",
                            "trkselhiptcentral",
+			   "trksellopt",
+			   "trkselloptfwd",
+			   "trkselloptcentral",
                            "unmatchedVtx",
                            "seltpmatched",
+			   "seltpmatchedhipt",
                            "seltpmatchedSignal",
                            "seltpmatchedPU",
                            "seltpunmatched",
@@ -1958,7 +1952,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
       addn(h, new TH1F("trestrk", "track time residual", 400, -2., 2.));
       addn(h, new TH1F("tpulltrk", "track--vertex pull", 200, -10., 10.));
     }
-    addn(h, new TH1F("phi", "phi", 80, -3.14159, 3.14159));
+    addn(h, new TH1F("phi", "phi", 320, -3.14159, 3.14159));
     addn(h, new TH1F("eta", "eta ", netabin, -etarange, etarange));
     addn(h, new TH1F("pt", "pt ", 100, 0., 5.));
     addn(h, new TH1F("logpt", "logpt ", 60, -1., 5.));
@@ -2028,14 +2022,19 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
 
     // fillTrackHistosMatched
     //  - tracks with MC truth (matched to TrackingParticles)
+    const double pull_cut_off = 10.; // for profile histograms
+    const double zrecsim_cut_off = 2.; 
     addnSP(h, new TH1D("tkzrecsim", "zrec-zsim", 200, -0.1, 0.1));
     addnSP(h, new TH1D("tkzrecsimpull", "(zrec-zsim) / #sigma_{z}", 300, -15., 15.));
-    addnSP(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", netabin, -etarange, etarange, 0., 1000.));
+    addnSP(h, new TProfile("tkzrecsimpullsqvseta", "zrec-zsim pull**2 vs eta", netabin, -etarange, etarange, 0., pull_cut_off * pull_cut_off));
+    addnSP(h, new TProfile("tkzrecsimsqvseta", "(zrec-zsim)**2 vs eta", netabin, -etarange, etarange, 0., zrecsim_cut_off*zrecsim_cut_off));
+    addnSP(h, new TProfile("tkzrecsimsqvsetahipt", "(zrec-zsim)**2 vs eta (high pt)", netabin, -etarange, etarange, 0., zrecsim_cut_off*zrecsim_cut_off));
     addnSP(h, new TH2F("tkzrecsimpullvseta", "zrec-zsim pull vs eta", netabin, -etarange, etarange, 200, -20., 20.));
-    addnSP(h, new TProfile("tkzrecsimvsz",   "zrec-zsim vs z", 100, -15., 15., -1000., 1000.));
-    addnSP(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", netabin, -etarange, etarange, -1000., 1000.));
-    addnSP(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", netabin, -etarange, etarange, -1000., 1000.));
-    addnSP(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", netabin, -etarange, etarange, 200, -4., 4.));
+    addnSP(h, new TProfile("tkzrecsimvsz",   "zrec-zsim vs z", 100, -15., 15., -zrecsim_cut_off, zrecsim_cut_off));
+    addnSP(h, new TProfile("tkzrecsimvseta", "zrec-zsim vs eta", netabin, -etarange, etarange, -zrecsim_cut_off, zrecsim_cut_off));
+    addnSP(h, new TProfile("tkzrecsimvsetaz", "zrec-zsim vs eta with z-flip", netabin, -etarange, etarange, -zrecsim_cut_off, zrecsim_cut_off));
+    addnSP(h, new TH2F("tkzrecsimvseta2d", "zrec-zsim vs eta", netabin, -etarange, etarange, 400, -2., 2.));
+    addnSP(h, new TH2F("tkzrecsimvseta2dhipt", "zrec-zsim vs eta (high pt)", netabin, -etarange, etarange, 400, -0.4, 0.4));
 
     addnSP(h, new TH2F("tkptrecsimrelvssimeta2d", "(pTrec-pTsim)/pTrec vs eta_{TP}", netabin, -etarange, etarange, 300, -0.3, 0.3));
     addnSP(h, new TH2F("tkptrecsimpullvssimeta2d", "pTrec-pTsim pull vs eta_{TP}", netabin, -etarange, etarange, 100, -15., 15.));
@@ -2046,6 +2045,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addnSP(h, new TH2F("tkzrecsimpullvssimeta2d" , "zrec-zsim pull vs eta_{TP}", netabin, -etarange, etarange, 300, -15., 15.));
     addnSP(h, new TH2F("tkdzrecvssimeta2d", "zError vs eta_{TP}", netabin, -etarange, etarange, 200, -0.2, 0.2));
 
+
     addnSP(h, new TH1D("tktrecsim", "trec-tsim", 200, -0.3, 0.3));
     addnSP(h, new TH1D("tktrecsimpull", "(trec-tsim)/terr", 200, -10., 10.));
     addnSP(h, new TH1D("tktrecsim_pid", "trec-tsim (pid)", 200, -0.3, 0.3));
@@ -2054,7 +2054,12 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addnSP(h, new TH2F("tktrecsimvseta2d", "trec-tsim vs eta", netabin, -etarange, etarange, 200, -1.0, 1.0));
     addnSP(h, new TProfile("tktrecsimpullsqvserr", "((trec-tsim)/terr)**2 vs terr", 50, 0., 0.5, 0., 100.0));
     addnSP(h, new TH2F("tktrecsimpullvserr", "(trec-tsim)/terr vs terr", 50, 0., 0.5, 50, 0., 100.0));
-    addnSP(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -1000., 1000.));
+    addnSP(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -pull_cut_off, pull_cut_off));
+
+    addnSP(h, new TH2F("tkpidvsetalogpt", "all particle types", netabin, -etarange, etarange, 60, -1., 5));
+    addnSP(h, new TH2F("tkpidpionvsetalogpt", "pions", netabin, -etarange, etarange, 60, -1., 5));
+    addnSP(h, new TH2F("tkpidkaonvsetalogpt", "kaons", netabin, -etarange, etarange, 60, -1., 5));
+    addnSP(h, new TH2F("tkpidprotonvsetalogpt", "protons", netabin, -etarange, etarange, 60, -1., 5));
     dir->cd();
   }  // track types
   
@@ -4797,18 +4802,6 @@ void PrimaryVertexAnalyzer4PU::fillRecoVertexHistos(std::map<std::string, TH1*>&
   Fill(h, vtype + "/numlowttrk", float(nlowt) );
   if (v->tracksSize() > 0) Fill(h, vtype + "/fraclowttrk", float(nlowt) / v->tracksSize());
 
-  /* consider dropping this
-  if (f4D_) {
-    double t, tError;
-    if (vertex_time_from_tracks(*v, tracks, 0, t, tError)) {
-      Fill(h, vtype + "/tvtx_fromtracks", t);
-      Fill(h, vtype + "/terrvtx_fromtracks", tError);
-      Fill(h, vtype + "/tvtx_withtracks", v->t());
-      Fill(h, vtype + "/terrvtx_withtracks", v->tError());
-    }
-  }
-  */
-  
   if (deltaz != 0) {
     double pzsum = 0;
     double ptsum = 0;
@@ -5079,10 +5072,15 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       
       double t_fromtracks, tError_fromtracks;
       bool timing_from_tracks = vertex_time_from_tracks(v.recovertex(), tracks, 0, t_fromtracks, tError_fromtracks);
+
+      double t_fromtracks_qual, tError_fromtracks_qual;
+      bool timing_from_tracks_qual = vertex_time_from_tracks(v.recovertex(), tracks, 0.8, t_fromtracks_qual, tError_fromtracks_qual);
+
       double t_fromtracks_pid, tError_fromtracks_pid;
       timer_start("vertex_time_from_tracks_pid");
       bool timing_from_tracks_pid = vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0, t_fromtracks_pid, tError_fromtracks_pid);
       timer_stop("vertex_time_from_tracks_pid");
+
       double t_fromtracks_qual_pid, tError_fromtracks_qual_pid;
       bool timing_from_tracks_qual_pid = vertex_time_from_tracks_pid_newton(*(v.recvtx), tracks, 0.8, t_fromtracks_qual_pid, tError_fromtracks_qual_pid);
 
@@ -5113,7 +5111,23 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       else
 	{
 	  report_counted("fillVertexHistosMatched: timing from tracks failed",1);
-	  //reportVertex(*v, Form("timing from tracks failed,  with tracks: %f", v.tError()), false);
+	}
+
+      if (timing_from_tracks_qual)
+	{
+	  // timing from tracks
+	  Fill(h, vtype + "/trecsim_fromtracks_qual" , t_fromtracks_qual - simevt.t, simevt.is_signal());
+	  Fill(h, vtype + "/trecerr_fromtracks_qual", tError_fromtracks_qual, simevt.is_signal());
+	  Fill(h, vtype + "/trecsimpull_fromtracks_qual", (t_fromtracks_qual - simevt.t) / tError_fromtracks_qual, simevt.is_signal());
+
+	  // also fill histos with the default values for the same list of vertices for comparison
+	  Fill(h, vtype + "/trecsim_withtracks", v.t() - tsim, simevt.is_signal());
+	  Fill(h, vtype + "/trecerr_withtracks", v.tError(), simevt.is_signal());
+	  Fill(h, vtype + "/trecsimpull_withtracks", (v.t() - tsim) / v.tError(), simevt.is_signal());
+	}
+      else
+	{
+	  report_counted("fillVertexHistosMatched: timing from tracks with quality failed",1);
 	}
 
       if (timing_from_tracks_pid)
@@ -5130,8 +5144,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 	}
       else
 	{
-	  report_counted("fillVertexHistosMatched: timing from tracks failed",1);
-	  //reportVertex(*v, Form("timing from tracks failed,  with tracks: %f", v.tError()), false);
+	  report_counted("fillVertexHistosMatched: pid timing from tracks failed",1);
 	}
 
       
@@ -5149,8 +5162,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 	}
       else
 	{
-	  report_counted("fillVertexHistosMatched: timing from tracks failed",1);
-	  //reportVertex(*v, Form("timing from tracks failed,  with tracks: %f", v.tError()), false);
+	  report_counted("fillVertexHistosMatched: pid timing from tracks with quality failed",1);
 	}
     }
 }
@@ -5363,6 +5375,9 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
   Fill(h, ttype + "/tkzrecsimpullsqvseta", rec_eta, dzPull*dzPull, isSignalPV);
   Fill(h, ttype + "/tkzrecsimvseta", rec_eta, dzDiff, isSignalPV);
   Fill(h, ttype + "/tkzrecsimvseta2d", rec_eta, dzDiff, isSignalPV);
+  if(tk.pt() > trkhiptmin_) Fill(h, ttype + "/tkzrecsimvseta2dhipt", rec_eta, dzDiff, isSignalPV);
+  Fill(h, ttype + "/tkzrecsimsqvseta", rec_eta, dzDiff*dzDiff, isSignalPV);
+  if(tk.pt() > trkhiptmin_) Fill(h, ttype + "/tkzrecsimsqvsetahipt", rec_eta, dzDiff*dzDiff, isSignalPV);
   Fill(h, ttype + "/tkzrecsimvsz", sim_z, dzDiff, isSignalPV);
   Fill(h, ttype + "/tkzrecsimvslogpt", log(rec_pt)/log(10.), dzDiff * (rec_eta < 0. ? -1. : 1.), isSignalPV);
   Fill(h, ttype + "/tkzrecsimvsetaz", rec_eta, dzDiff * (rec_z < 0. ? -1. : 1.), isSignalPV);
@@ -5392,6 +5407,16 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
     Fill(h, ttype + "/tktrecsimvseta2d", rec_eta, dtDiff, isSignalPV);
     Fill(h, ttype + "/tktrecsimpullsqvserr", rec_dt, dtPull2, isSignalPV);
     Fill(h, ttype + "/tktrecsimpullvserr", rec_dt, dtPull, isSignalPV);
+
+    Fill(h, ttype + "/tkpidvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+    if (tk.is_pion()){
+      Fill(h, ttype + "/tkpidpionvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+    }else if(tk.is_kaon()){
+      Fill(h, ttype + "/tkpidkaonvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+    }else if(tk.is_proton()){
+      Fill(h, ttype + "/tkpidprotonvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+    }
+
   }
 }
 
@@ -5742,11 +5767,12 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
 		Fill(hTrk, "tpulltrk_selmatched_barrel", (tk.t() - tk.tsim()) /  tk.dt() );
 		Fill(hTrk, "trestrkvszrestrk_selmatched_barrel", tk.z() - tk.zsim(), tk.t() - tk.tsim());
 		Fill(hTrk, "tqualtrk_rec_selmatched_barrel", tk.timeQuality());
-		if(tk.pt() > 1.0){
+		if(tk.pt() > trkhiptmin_){
 		  Fill(hTrk, "tpulltrk_selmatched_barrel_hipt", (tk.t() - tk.tsim()) /  tk.dt() );
 		  Fill(hTrk, "trestrk_selmatched_barrel_hipt", tk.t() - tk.tsim());
 		  Fill(hTrk, "tqualtrk_rec_selmatched_barrel_hipt", tk.timeQuality());
-		}else{
+		}
+		if(tk.pt() < trkloptmax_){
 		  Fill(hTrk, "trestrk_selmatched_barrel_lopt", tk.t() - tk.tsim());
 		  Fill(hTrk, "tpulltrk_selmatched_barrel_lopt", (tk.t() - tk.tsim()) /  tk.dt() );
 		  Fill(hTrk, "tqualtrk_rec_selmatched_barrel_lopt", tk.timeQuality());
@@ -5759,11 +5785,12 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
 		Fill(hTrk, "terrtrk_rec_selmatched_endcap", tk.dt() );
 		Fill(hTrk, "tpulltrk_selmatched_endcap", (tk.t() - tk.tsim()) /  tk.dt() );
 		Fill(hTrk, "tqualtrk_rec_selmatched_endcap", tk.timeQuality());
-		if(tk.pt() > 1.0){
+		if(tk.pt() > trkhiptmin_){
 		  Fill(hTrk, "trestrk_selmatched_endcap_hipt", tk.t() - tk.tsim());
 		  Fill(hTrk, "tpulltrk_selmatched_endcap_hipt", (tk.t() - tk.tsim()) /  tk.dt() );
 		  Fill(hTrk, "tqualtrk_rec_selmatched_endcap_hipt", tk.timeQuality());
-		}else{
+		}
+		if(tk.pt() < trkloptmax_){
 		  Fill(hTrk, "trestrk_selmatched_endcap_lopt", tk.t() - tk.tsim());
 		  Fill(hTrk, "tpulltrk_selmatched_endcap_lopt", (tk.t()- tk.tsim()) /  tk.dt() );
 		  Fill(hTrk, "tqualtrk_rec_selmatched_endcap_lopt", tk.timeQuality());
@@ -7783,11 +7810,19 @@ void PrimaryVertexAnalyzer4PU::printMatchingSummary(MVertexCollection & vertexes
   for (unsigned int idxsim = 0; idxsim < simEvt.size(); idxsim++) {
     if ((simEvt[idxsim].is_visible()) && (simEvt[idxsim].rec == NOT_MATCHED_VTX_REC)) {
       std::ostringstream s;
-      s << setw(9) << setprecision(4) << fixed << simEvt[idxsim].z << "," << setw(7) << setprecision(3) << fixed
+      if (idxsim == 0){
+	s << "*";
+      }else{
+	s << " ";
+      }
+      s << setw(8) << setprecision(4) << fixed << simEvt[idxsim].z << "," << setw(7) << setprecision(3) << fixed
         << simEvt[idxsim].t << " " << setw(1) << "[" << setw(3) << idxsim << "]"
 	<< setw(4) << simEvt[idxsim].rtk.size() << " "
         << formatMatchList(simEvt[idxsim].wnt, 3, true)
 	<< "%";
+      if (idxsim == 0 ) {
+	s << "      signal vertex not matched   ";
+      }
       row.push_back(make_pair(simEvt[idxsim].z, s.str()));
     }
   }
@@ -7800,7 +7835,12 @@ void PrimaryVertexAnalyzer4PU::printMatchingSummary(MVertexCollection & vertexes
       assert(vertexes(idxrec).sim == idxsim);
 
       std::ostringstream s;
-      s << setw(9) << setprecision(4) << fixed << simEvt[idxsim].z << "," << setw(7) << setprecision(3) << fixed
+      if (idxsim == 0){
+	s << "*";
+      }else{
+	s << " ";
+      }
+      s << setw(8) << setprecision(4) << fixed << simEvt[idxsim].z << "," << setw(7) << setprecision(3) << fixed
         << simEvt[idxsim].t << " " << setw(1) << "[" << setw(3) << idxsim << "]"
 	<< setw(4) << simEvt[idxsim].rtk.size() << " "
         << formatMatchList(simEvt[idxsim].wnt, 3, true) << setw(9) << setprecision(4) << fixed
@@ -9216,8 +9256,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
   }
 
   unsigned int ntpfake = 0;
-  unsigned int ntpfake4 = 0;
-  unsigned int ntpfound = 0, ntpfound4 = 0;
+  unsigned int ntpreal = 0;
   unsigned int ntpfakesel = 0, ntprealsel = 0, ntpsplitsel = 0, ntpotherfakesel = 0, ntpsel = 0;
   unsigned int ntpsplitselfromsignal = 0, ntpsplitselfrompu = 0;
 
@@ -9238,15 +9277,14 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 	}
       
       ntpsel++;
-      if (vtxs[iv].is_fake()) {
-        ntpfakesel++;
-      }
+
       if (vtxs[iv].is_real()) {
+	// real selected
         ntprealsel++;
 	fillVertexHistosMatched(h, "matchedvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
     
 	if(vtxs[iv].is_signal()){
-	  fillVertexHistosMatched(h, "matchedsignalvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
+	  // signal
 	  for( auto tv : vtxs(iv).tracks){
 	    if (tv->dz() < 0.01) {
 	      fillTrackHistos(h, "matchedsignalvtxseldriver", *tv, vtxs(iv).recvtx);
@@ -9264,113 +9302,75 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 	    reportEvent(Form("signal vertex selected at index [%d]    %s", iv,comment.c_str()), false);
 	  }
 	}else{
-	  fillVertexHistosMatched(h, "matchedpuvtxsel",  vtxs.at(iv), tracks, simEvt, deltaz);
+	  // PU
 	  if(iv == 0){
 	    reportEvent(Form("PU vertex selected at index [0]"), false);
 	  }
 	}
-      }
-
-      if (vtxs[iv].split_from() >= 0) {
-        ntpsplitsel++;
-	fillVertexHistos(h, "splitvtxsel",  vtxs.at(iv), tracks, deltaz);
-      }
-
-      if (vtxs[iv].split_from() == 0) {
-        ntpsplitselfromsignal++;
-	fillVertexHistos(h, "splitvtxselfromsignal",  vtxs.at(iv), tracks, deltaz);
-	reportEvent(Form("split signal vertex selected at index [%d]", iv), false);
-
-	for (auto tv : vtxs(iv).tracks){
-	  if (tv->dz() < 0.0100) {
-	    fillTrackHistos(h, "splitvtxselfromsignaldriver", *tv, vtxs(iv).recvtx);
-	  }
-        }
 	
-      }
-      if (vtxs[iv].split_from() > 0) {
-        ntpsplitselfrompu++;
-	fillVertexHistos(h, "splitvtxselfrompu",  vtxs(iv), tracks, deltaz);
-      }
-      if (vtxs[iv].other_fake()) {
-        ntpotherfakesel++;
-	fillVertexHistos(h, "otherfakevtxsel",  vtxs(iv), tracks, deltaz);
-      }
-    }
+      }else{
+	
+	// fake selected
+        ntpfakesel++;
 
-    /* remove
-    double z = vtxs.at(iv).z();
-    double vxx = vtxs.at(iv).covariance(iX, iX) + pow(vertexBeamSpot_.BeamWidthX(), 2);
-    double vyy = vtxs.at(iv).covariance(iY, iY) + pow(vertexBeamSpot_.BeamWidthY(), 2);
-    ;
-    double vxy = vtxs.at(iv).covariance(iX, iY);
-    double dx = vtxs.at(iv).x() - vertexBeamSpot_.x(z);
-    double dy = vtxs.at(iv).y() - vertexBeamSpot_.y(z);
-    double D = vxx * vyy - vxy * vxy;
-    double c2xy = pow(dx, 2) * vyy / D + pow(dy, 2) * vxx / D - 2 * dx * dy * vxy / D;
-    */
-    double c2xy = vtxs(iv).c2xy(vertexBeamSpot_);
-    Fill(h, "vtxcxy2", c2xy);
+	fillVertexHistos(h, "fakevtxsel",  vtxs.at(iv), tracks, deltaz);
+      
+	if (vtxs[iv].split_from() >= 0) {
+	  ntpsplitsel++;
+	  fillVertexHistos(h, "splitvtxsel",  vtxs.at(iv), tracks, deltaz);
+	}
 
-    double vtx_trec = vtxs.at(iv).t();
-    double vtx_terr = vtxs.at(iv).tError();
+	if (vtxs[iv].split_from() == 0) {
+	  ntpsplitselfromsignal++;
+	  fillVertexHistos(h, "splitvtxselfromsignal",  vtxs.at(iv), tracks, deltaz);
+	  reportEvent(Form("split signal vertex selected at index [%d]", iv), false);
 
-    // this is obsolete, use what is filled by   fillVertexHistosMatched(h, "matchedvtx"...) instead
-    if (vtxs[iv].is_real() && select(vtxs(iv))) {
-      double vtx_tsim = simEvt[vtxs[iv].sim].t;
-      Fill(h, "trecvtx_selmatched", vtx_trec);
-      Fill(h, "tsimvtx_selmatched", vtx_tsim);
-      Fill(h, "tresvtx_selmatched", vtx_trec - vtx_tsim);
-      Fill(h, "tpullvtx_selmatched", (vtx_trec - vtx_tsim) / vtx_terr);
-      auto xres = vtxs.at(iv).x() - simEvt[vtxs[iv].sim].x;
-      auto yres = vtxs.at(iv).y() - simEvt[vtxs[iv].sim].y;
-      auto zres = vtxs.at(iv).z() - simEvt[vtxs[iv].sim].z;
-      bool is_signal = vtxs[iv].is_signal();
-      Fill(h, "xresvtx_selmatched", xres, is_signal);
-      Fill(h, "yresvtx_selmatched", yres, is_signal);
-      Fill(h, "zresvtx_selmatched", zres, is_signal);
-    }
+	  for (auto tv : vtxs(iv).tracks){
+	    if (tv->dz() < 0.0100) {
+	      fillTrackHistos(h, "splitvtxselfromsignaldriver", *tv, vtxs(iv).recvtx);
+	    }
+	  }
+	
+	}
+
+	if (vtxs[iv].split_from() > 0) {
+	  ntpsplitselfrompu++;
+	  fillVertexHistos(h, "splitvtxselfrompu",  vtxs(iv), tracks, deltaz);
+	}
+
+	if (vtxs[iv].other_fake()) {
+	  ntpotherfakesel++;
+	  fillVertexHistos(h, "otherfakevtxsel",  vtxs(iv), tracks, deltaz);
+	}
+      } // fake selected
+    } // selected vertex iv
+
 
     if (vtxs(iv).is_real()) {
       // matched, but not necessarily selected, note that matched and selected are filled above
+      ntpreal++;
       fillVertexHistosMatched(h, "matchedvtx", vtxs.at(iv), tracks, simEvt);
     }
 
     if (vtxs[iv].is_fake()) {
+      // fake (selected or not)
       ntpfake++;
-      if (vtxs(iv).ndof() > 4) {
-        ntpfake4++;
-      }
-
-      Fill(h, "vtxcxy2Fake", c2xy);
-      Fill(h, "vtxprobxyFake", TMath::Prob(c2xy, 2));
-      Fill(h, "ndofFake", vtxs(iv).ndof());
-      Fill(h, "logndofFake", vtxs(iv).ndof() > 0 ? log(vtxs(iv).ndof())/log(10.) : -10.);
 
       if (vtxs(iv).ndof() > 50) {
         reportVertex(vtxs(iv).recovertex(), Form("big fake vertex ndof=%f , split_from=%d", 
 						  vtxs(iv).ndof(), vtxs(iv).split_from()), dump_big_fakes_);
-      }
-    } else {
-      Fill(h, "vtxcxy2Matched", c2xy);
-      Fill(h, "vtxprobxyMatched", TMath::Prob(c2xy, 2));
-      Fill(h, "ndofMatched", vtxs.at(iv).ndof());
-      ntpfound++;
-
-      if (select(vtxs(iv))) {
-        ntpfound4++;
       }
     }
   }  // end of recvtx loop
 
   Fill(h, "ntpsplitselfromsignal", float(ntpsplitselfromsignal));
   Fill(h, "ntpsplitselfrompu", float(ntpsplitselfrompu));
-  Fill(h, "ntpfake0", float(ntpfake));
-  Fill(h, "ntpfake4", float(ntpfake4));
-  Fill(h, "ntpfound0", float(ntpfound));
-  Fill(h, "ntpfound4", float(ntpfound4));
-  Fill(h, "ntpfake4prof", npu, float(ntpfake4));
-  Fill(h, "ntpfound4prof", npu, float(ntpfound4));
+  Fill(h, "ntpfake", float(ntpfake));
+  Fill(h, "ntpfakesel", float(ntpfakesel));
+  Fill(h, "ntpreal", float(ntpreal));
+  Fill(h, "ntprealsel", float(ntprealsel));
+  Fill(h, "ntpfakeselprof", npu, float(ntpfakesel));  // duplicate if npu = simpu_
+  Fill(h, "ntprealselprof", npu, float(ntprealsel));
 
   Fill(h, "ntpselvssimPU", simPU_, float(ntpsel));
   Fill(h, "ntpfakeselvssimPU", simPU_, float(ntpfakesel));
@@ -10177,314 +10177,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexRecoCPUTime(std::map<std::string, TH
 
 
 
-//******* the following code does not require MC and will/should work for data, requires tracks **********
-/***************************************************************************************/
-void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco_obsolete(std::map<std::string, TH1*>& h,
-                                                           const reco::VertexCollection* recVtxs,
-                                                           Tracks& tracks,
-                                                           const std::string message)
-/***************************************************************************************/
-{
-  cout << "PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco (obsolete)" << message << endl;
-
-  // and such
-
-  int nrectrks = tracks.size();
-
-  // repeat some counting here from analyzeVertexCollectionNotrack, needed for eventclassification and correlation
-  int nrecvtx = 0;
-  int nselvtx = 0;
-  int nvtxselgt1sigmaz = 0;
-  for (unsigned int iv = 0; iv < recVtxs->size(); iv++) {
-    const reco::Vertex* v = &(recVtxs->at(iv));
-    if (!(v->isFake()) && (v->ndof() > 0)) {
-      nrecvtx++;
-    }
-
-    fillRecoVertexHistos(h, "rec", &(*v), tracks, iv);
-    if(iv == 0){fillRecoVertexHistos(h, "tagged", &(*v), tracks, iv);}
-    
-    if (select(*v)) {
-      nselvtx++;
-      fillRecoVertexHistos(h, "selected", &(*v), tracks, iv);
-      if (std::abs(v->position().z() - vertexBeamSpot_.z0() - dzb_) > sigmaZ_) {
-        nvtxselgt1sigmaz++;
-      }
-    }
-  }
-
-
-
-
-  // distance to first vertex and ndof for different positions in the vertex list
-  if( (recVtxs->size() > 1) && (select(recVtxs->at(0))) ){
-    double z0 = recVtxs->at(0).position().z();
-    Fill(h, "ndof-vtx0", recVtxs->at(0).ndof());
-    Fill(h, "logsumpt2-vtx0", log(vertex_sumpt2(recVtxs->at(0))));
-    Fill(h, "logndof-vtx0", log(recVtxs->at(0).ndof())/log(10.));
-
-    for (unsigned int iv = 1; iv < recVtxs->size(); iv++) {
-      const reco::Vertex* v = &(recVtxs->at(iv));
-      if(select(*v)){
-	if(iv < 10){
-	    Fill(h, Form("zdiffrec-vtx%d", iv), v->position().z() - z0);
-	    Fill(h, Form("ndof-vtx%d", iv), v->ndof());
-	    Fill(h, Form("logndof-vtx%d", iv), log(v->ndof())/log(10.));
-	    Fill(h, Form("logsumpt2-vtx%d", iv), log(vertex_sumpt2(*v)));
-	}else{
-	  Fill(h, "zdiffrec-vtxgt9", v->position().z() - z0);
-	  Fill(h, "ndof-vtxgt9", v->ndof());
-	  Fill(h, "logndof-vtxgt9", log(v->ndof())/log(10.));
-	  Fill(h, "logsumpt2-vtxgt9", log(vertex_sumpt2(*v)));
-	}
-      }
-    }
-  }
-
-  bool is_hiPU = lumiPU_ > 50;
-  //bool is_tail =  (lumiPU_ > 40) && (nselvtx > (0.8*lumiPU_ + 3*sqrt(0.8*lumiPU_)));
-  bool is_tail = (lumiPU_ > 40) && (nvtxselgt1sigmaz > (0.24 * lumiPU_ + 3 * sqrt(0.24 * lumiPU_)));
-
-  // -----------------  reconstructed tracks  ------------------------
-  // the list of selected tracks can only be correct if the selection parameterset  and track collection
-  // is the same that was used for the reconstruction
-
-  auto const* pv0_ptr = (recVtxs->size() > 0) and recVtxs->begin()->isValid() ? &(*recVtxs->begin()) : NULL;
-
-  for (unsigned int i = 0; i < tracks.size(); i++) {
-    MTrack tk = tracks(i);
-    RefToBase<reco::Track> t = tracks.ref(i);
-
-    fillTrackHistos(h, "trkall", tk, pv0_ptr);
-
-    if (MC_)
-    // histogram the fraction of truth-matched tracks vs z, requires TP and should not be here!!!
-    {
-      if (tracks(i).matched()) {
-        Fill(h, "matchedallfractionvsz", t->vz(), 1.);
-        Fill(h, "unmatchedallfractionvsz", t->vz(), 0.);
-      } else {
-        Fill(h, "unmatchedallfractionvsz", t->vz(), 1.);
-        Fill(h, "matchedallfractionvsz", t->vz(), 0.);
-      }
-    }
-
-    if (MC_ && f4D_ && tk.matched() && tk.has_timing())
-      {
-	if ((tk.dt() >0) && (tk.dt() < 0.1) && (fabs(tk.tres()) > 5. * tk.dt()))
-	  {
-	    fillTrackHistos(h, "MTDtail", tk);
-	  }
-      }
-  }
-
-  // ---- selected tracks
-
-  int nseltrks = 0;
-  int nseltrksptlt04 = 0;
-  int nseltrksptlt03 = 0;
-  int nseltrksptlt02 = 0;
-
-  for (unsigned int i = 0; i < tracks.size(); i++) {
-
-    //RefToBase<reco::Track> t = tracks.ref(i);
-    MTrack tk = tracks(i);
-
-    if (tk.selected()) {
-
-      fillTrackHistos(h, "trksel", tk, pv0_ptr);
-
-      nseltrks++;
-      if (tk.pt() < 0.4)
-        nseltrksptlt04++;
-      if (tk.pt() < 0.3)
-        nseltrksptlt03++;
-      if (tk.pt() < 0.2)
-        nseltrksptlt02++;
-
-      if (tk.has_hitPattern()){
-	auto hitPattern = tk.hitPattern();
-      auto nmiss = hitPattern.numberOfLostHits(HitPattern::MISSING_INNER_HITS); 
-      if(nmiss == 0){
-	fillTrackHistos(h, "missing_inner0", tk, pv0_ptr);
-      }else if(nmiss == 1){
-	fillTrackHistos(h, "missing_inner1", tk, pv0_ptr);
-      }else if (nmiss == 2){
-	fillTrackHistos(h, "missing_inner2", tk, pv0_ptr);
-      }
-
-      auto nbarrel = hitPattern.pixelBarrelLayersWithMeasurement();
-      if(nbarrel <2){
-	fillTrackHistos(h, "nbarrel_lt2", tk, pv0_ptr);
-      }else if(nbarrel ==2){
-	fillTrackHistos(h, "nbarrel_eq2", tk, pv0_ptr);
-      }      
-      }
-      
-      if((abs(tk.z()) < 4) && (tk.dz() < 0.01) && (abs(tk.eta()) > 1.4) && (abs(tk.eta()) < 1.8)){
-	fillTrackHistos(h, "highetadriver", tk, pv0_ptr);
-      }
-      if((abs(tk.z()) < 4) && (tk.dz() < 0.01)){
-	fillTrackHistos(h, "alletadriver", tk, pv0_ptr);
-      }
-
-      if (is_hiPU) {
-        fillTrackHistos(h, "thipu", tk, pv0_ptr);
-      }  // all tracks here, not only those that are in a vertex (->"hipu" without a "t")
-
-      if (is_tail) {
-        fillTrackHistos(h, "ttail", tk, pv0_ptr);
-        double z = tk.z();
-        if (fabs(z - vertexBeamSpot_.z0() - dzb_) > sigmaZ_)
-          fillTrackHistos(h, "ttailzgt1", tk, pv0_ptr);
-      }
-
-      if (MC_) {
-        if (tk.matched()) {
-          fillTrackHistos(h, "seltpmatched", tk);
-	  if (abs(tk.pt() > 10.) && (abs(tk.eta())<0.5))
-	    fillTrackHistos(h, "hiptcentral", tk);
-          if (abs(tk.t()) > 1.0)
-            fillTrackHistos(h, "seltpmatched_tgt1", tk);
-	  if (tk._simEvt == 0){
-            fillTrackHistos(h, "seltpmatchedSignal", tk);
-	  }else{
-            fillTrackHistos(h, "seltpmatchedPU", tk);
-	  }
-          Fill(h, "matchedselfractionvsz", tk.z(), 1.);
-          Fill(h, "unmatchedselfractionvsz", tk.z(), 0.);
-        } else {
-          Fill(h, "matchedselfractionvsz", tk.z(), 0.);
-          Fill(h, "unmatchedselfractionvsz", tk.z(), 1.);
-          fillTrackHistos(h, "seltpunmatched", tk);
-        }
-      }
-
-
-      // the following code is insane, replace it by tk.get_recv(label) != NO_VERTEX or invent tk.is_lost(label)
-      int foundinvtx = 0;
-      int nvtemp = -1;
-      RefToBase<reco::Track> t = tracks.ref(i);
-      for (reco::VertexCollection::const_iterator v = recVtxs->begin(); v != recVtxs->end(); ++v) {
-        nvtemp++;
-        if ((v->isFake()) || (v->ndof() < -2))
-          break;
-        for (trackit_t tv = v->tracks_begin(); tv != v->tracks_end(); tv++) {
-          if (((**tv).vz() == t->vz() && ((**tv).phi() == t->phi()))) {
-            foundinvtx++;
-          }
-        }
-      }
-
-      if (foundinvtx == 0) {
-        fillTrackHistos(h, "sellost", tk);
-      } else if (foundinvtx > 1) {
-        //	cout << "track found in " << foundinvtx << " vertices" endl;
-      }
-    }
-  }
-
-  if (nseltrks < minNumberOfSelTrks_) {
-    cout << "Event without tracks skipped   run= " << run_ << " ls = " << luminosityBlock_ << " BX=" << bunchCrossing_
-         << "  instBXLumi_=" << 1.e3 * instBXLumi_ << " expected PU = " << lumiPU_ << "    selected tracks " << nseltrks
-         << " rec tracks = " << nrectrks << std::endl;
-    return;
-  }
-
-  // event
-  Fill(h, "nseltrk", nseltrks);
-  Fill(h, "nrectrk", nrectrks);
-  Fill(h, "nseltrkvsLPUprof", lumiPU_, float(nseltrks));
-  Fill(h, "nrectrkvsLPUprof", lumiPU_, float(nrectrks));
-  Fill(h, "nseltrkptlt04vsLPUprof", lumiPU_, float(nseltrksptlt04));
-  Fill(h, "nseltrkptlt03vsLPUprof", lumiPU_, float(nseltrksptlt03));
-  Fill(h, "nseltrkptlt02vsLPUprof", lumiPU_, float(nseltrksptlt02));
-
-  Fill(h, "nrecvtx4vsnrectrk", float(nrectrks), float(nselvtx));
-  Fill(h, "nrecvtx4vsnrectrkprof", float(nrectrks), float(nselvtx));
-  Fill(h, "nrecvtx4vsnseltrk", float(nseltrks), float(nselvtx));
-  Fill(h, "nrecvtx4vsnseltrkprof", float(nseltrks), float(nselvtx));
-
-  if (is_tail) {
-    Fill(h, "nrecvtx4vsnseltrk_tail", float(nseltrks), float(nselvtx));
-    Fill(h, "nrecvtx4vsnseltrkprof_tail", float(nseltrks), float(nselvtx));
-  }
-  if (is_hiPU) {
-    Fill(h, "nrecvtx4vsnseltrk_hipu", float(nseltrks), float(nselvtx));
-    Fill(h, "nrecvtx4vsnseltrkprof_hipu", float(nseltrks), float(nselvtx));
-  }
-
-  if (nrecvtx > 0) {
-    Fill(h, "eff0vsntrec", nrectrks, 1.);
-    Fill(h, "eff0vsntsel", nseltrks, 1.);
-  } else {
-    Fill(h, "eff0vsntrec", nrectrks, 0.);
-    Fill(h, "eff0vsntsel", nseltrks, 0.);
-  }
-
-  // properties of events without a vertex
-  if ((nrecvtx == 0) || (recVtxs->begin()->isFake())) {
-    Fill(h, "nrectrk0vtx", nrectrks);
-    Fill(h, "nseltrk0vtx", nseltrks);
-  }
-
-  for (reco::VertexCollection::const_iterator v = recVtxs->begin(); v != recVtxs->end(); ++v) {
-    // count vertex tracks
-    double npt1 = 0, ntrkwgt05 = 0;
-    for (trackit_t t = v->tracks_begin(); t != v->tracks_end(); t++) {
-      if (v->trackWeight(*t) > 0.5) {
-        ntrkwgt05++;
-        Fill(h, "trackwtgt05vsz", v->position().z(), v->trackWeight(*t));
-      }
-      if ((**t).pt() > 1.0)
-        npt1++;
-      Fill(h, "trackwtvsz", v->position().z(), v->trackWeight(*t));
-    }
-    if (v->ndof() > 4) {
-      Fill(h, "ntrkpt1vsz", v->position().z(), npt1);
-      Fill(h, "ntrkwgt05vsz", v->position().z(), ntrkwgt05);
-      Fill(h, "ftrkwgt05vsz", v->position().z(), ntrkwgt05 / v->tracksSize());
-    }
-
-    Fill(h, "nbtksinvtx", v->tracksSize());
-    if (instBXLumi_ > 0) {
-      Fill(h, "nbtksinvtxvsL", 1e3 * instBXLumi_, float(v->tracksSize()));
-      Fill(h, "nbtksinvtxvsLPU", lumiPU_, float(v->tracksSize()));
-      if (v->ndof() > 4)
-        Fill(h, "nbtksinvtx4vsL", 1e3 * instBXLumi_, float(v->tracksSize()));
-      if (v->ndof() > 4)
-        Fill(h, "nbtksinvtx4vsLPU", lumiPU_, float(v->tracksSize()));
-    }
-    Fill(h, "nbtksinvtx2", v->tracksSize());
-
-    double sumw = 0.5 * (v->ndof() + 2);
-    if (v->ndof() > 4) {
-      Fill(h, "sumwvsz", v->position().z(), sumw);
-      Fill(h, "sumntkvsz", v->position().z(), (double)v->tracksSize());
-      Fill(h, "sumwoverntk", sumw / v->tracksSize());
-      Fill(h, "vtxndfoverntk", v->ndof() / v->tracksSize());
-      Fill(h, "vtxndf2overntk", (v->ndof() + 2) / v->tracksSize());
-      Fill(h, "sumwoverntkvsz", v->position().z(), sumw / v->tracksSize());
-      Fill(h, "sumwoverntkvsz4", v->position().z(), sumw / v->tracksSize());
-      if (ntrkwgt05 > 0) {
-        Fill(h, "sumwoverntkwgt05vsz", v->position().z(), sumw / ntrkwgt05);
-      }
-    }
-    if ((v->ndof() > 4) && (v->ndof() < 10)) {
-      Fill(h, "sumwoverntkvszlo", v->position().z(), sumw / v->tracksSize());
-    }
-    if ((v->ndof() > 4) && (v->ndof() < 10)) {
-      Fill(h, "sumwoverntkvszlo", v->position().z(), sumw / v->tracksSize());
-    }
-    if (v->ndof() > 20) {
-      Fill(h, "sumwoverntkvszhi", v->position().z(), sumw / v->tracksSize());
-    }
-    Fill(h, "ntrkvsz", v->position().z(), float(v->tracksSize()));
-  }
-
-}  // end of analyzeVertexCollectionReco_obsolete
-/***************************************************************************************/
-
 
 
 //******* the following code does not require MC and will/should work for data, requires tracks **********
@@ -10510,6 +10202,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
     }
 
     fillVertexHistos(h, "rec", v, tracks);
+
     if(iv == 0){fillVertexHistos(h, "tagged", v, tracks);}
 
     if (select(v)) {
@@ -10614,13 +10307,24 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
   for( auto tk : tracks){
     
     if ( tk.selected() ){
+
       fillTrackHistos(h, "trksel", tk, pv0_ptr);
-      if (abs(tk.pt()) > 3.){
+      // high pt track category
+      if (abs(tk.pt()) > trkhiptmin_){
 	  fillTrackHistos(h, "trkselhipt", tk);
-	  if(abs(tk.eta())<1.5){
+	  if(abs(tk.eta())< trkcentraletamax_){
 	    fillTrackHistos(h, "trkselhiptcentral", tk);
-	  }else if(abs(tk.eta())>3.0){
+	  }else if(abs(tk.eta())> trkhiptmin_){
 	    fillTrackHistos(h, "trkselhiptfwd", tk);
+	  }
+      }
+      // low pt track categoy
+      if (abs(tk.pt()) < trkloptmax_){
+	  fillTrackHistos(h, "trksellopt", tk);
+	  if(abs(tk.eta()) < trkcentraletamax_){
+	    fillTrackHistos(h, "trkselloptcentral", tk);
+	  }else if(abs(tk.eta())> trkloptmax_){
+	    fillTrackHistos(h, "trkselloptfwd", tk);
 	  }
       }
 	
@@ -10661,6 +10365,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
       if (MC_) {
         if (tk.matched()) {
           fillTrackHistos(h, "seltpmatched", tk);
+          if(tk.pt() > trkhiptmin_) fillTrackHistos(h, "seltpmatchedhipt", tk);
 	  if (tk._simEvt == 0){
             fillTrackHistos(h, "seltpmatchedSignal", tk);
 	  }else{
@@ -10670,7 +10375,6 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
           Fill(h, "unmatchedselfractionvsz", tk.z(), 0.);
         } else {
           Fill(h, "matchedselfractionvsz", tk.z(), 0.);
-          //Fill(h, "unmatchedselfractionvsz", t->vz(), 1.);
           Fill(h, "unmatchedselfractionvsz", tk.z(), 1.);
           fillTrackHistos(h, "seltpunmatched", tk);
         }
@@ -10679,6 +10383,9 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
       // is the track tk (not) part of any vertex?
       if (tk.get_recv(vtxs.label()) == NO_RECVTX){
         fillTrackHistos(h, "sellost", tk);
+      }
+      if (tk.get_weight(vtxs.label()) > 0.5){
+        fillTrackHistos(h, "selused", tk);
       }
     }
   }
