@@ -135,11 +135,34 @@ if opts.globalTag is not None:
 ###
 process.setSchedule_(cms.Schedule())
 
+# PSet for vertex-time algorithm "VertexTimeAlgorithmFromTracksPID"
+# called implicitly via offlinePrimaryVerticesWithTimeFromTracksPID.algorithm.refToPSet_
+from usercode.PrimaryVertexAnalyzer.VertexTimeAlgorithmFromTracksPID_cfi import VertexTimeAlgorithmFromTracksPID as _VertexTimeAlgorithmFromTracksPID
+process.PSetVertexTimeAlgorithmFromTracksPID = _VertexTimeAlgorithmFromTracksPID.clone(
+    trackMTDTimeVMapTag = 'trackExtenderWithMTD:generalTracktmtd',
+    trackMTDTimeErrorVMapTag = 'trackExtenderWithMTD:generalTracksigmatmtd',
+    trackMTDTimeQualityVMapTag = 'mtdTrackQualityMVA:mtdQualMVA',
+    trackMTDMomentumVMapTag = 'trackExtenderWithMTD:generalTrackp',
+    trackMTDPathLengthVMapTag = 'trackExtenderWithMTD:generalTrackPathLength',
+
+    minTrackVtxWeight = 0.5,
+    minTrackTimeQuality = 0.,
+    massPion = 0.139570,
+    massKaon = 0.493677,
+    massProton = 0.938272,
+    probPion = 0.7,
+    probKaon = 0.2,
+    probProton = 0.1,
+    coolingFactor = 0.5,
+)
+
 from usercode.PrimaryVertexAnalyzer.vertexTimeProducer_cfi import vertexTimeProducer as _vertexTimeProducer
-process.offlinePrimaryVerticesTimeMethod1 = _vertexTimeProducer.clone(
+process.offlinePrimaryVerticesWithTimeFromTracksPID = _vertexTimeProducer.clone(
     vertices = 'offlinePrimaryVertices',
-    tracks = 'generalTracks',
     produceVertices = True,
+    algorithm = dict(
+      refToPSet_ = cms.string('PSetVertexTimeAlgorithmFromTracksPID'),
+    )
 )
 
 def histoPSet(_valueMapTag, _nbins, _xmin, _xmax):
@@ -150,14 +173,14 @@ process.VertexHistograms_offlinePrimaryVertices = _vertexTimeAnalyzer.clone(
     vertices = 'offlinePrimaryVertices',
     maxNumberOfVertices = -1,
     histogramNamePrefix = 'vertex_',
-    histogramPSet = cms.PSet(
-      t_method1 = histoPSet('offlinePrimaryVerticesTimeMethod1:time', 600, -30, 30),
-      tError_method1 = histoPSet('offlinePrimaryVerticesTimeMethod1:timeError', 300, 0, 30)
+    histogramPSet = dict(
+        t_fromTracksPID = histoPSet('offlinePrimaryVerticesWithTimeFromTracksPID:time', 600, -30, 30),
+        tError_fromTracksPID = histoPSet('offlinePrimaryVerticesWithTimeFromTracksPID:timeError', 300, 0, 30)
     )
 )
 
 process.vertexAnalysisPath = cms.Path(
-    process.offlinePrimaryVerticesTimeMethod1
+    process.offlinePrimaryVerticesWithTimeFromTracksPID
   + process.VertexHistograms_offlinePrimaryVertices
 )
 
@@ -286,7 +309,7 @@ process.vertexAnalyser = cms.EDAnalyzer('PrimaryVertexAnalyzer4PU',
   useVertexFilter = cms.untracked.bool(False),
   compareCollections = cms.untracked.int32(0),
   vertexRecoCollections = cms.VInputTag(
-    'offlinePrimaryVerticesTimeMethod1',
+    'offlinePrimaryVerticesWithTimeFromTracksPID',
   ),
 )
 
