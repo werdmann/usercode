@@ -969,7 +969,8 @@ public:
     double t () const {return _t;};
     double dt () const {return _dt;};
     double z () const {return _z;};
-    double dz () const {return _dz;};
+    double dz () const {return _dz;}; // obsolete
+    double dzError () const {return _dz;};
     double pt () const {return _pt;}
     double eta () const {return _eta;}
     double phi () const {return _phi;}
@@ -1027,6 +1028,10 @@ public:
     double tpull () const {return (_t - _tsim) / _dt;}
     double zpull () const {return (_z - _zsim) / _dz;}
 
+    bool is_muon () const {
+      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 13));
+    }
+    
     bool is_pion () const {
       return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 211));
     }
@@ -1276,9 +1281,24 @@ private:
   double vertex_maxfrac(const reco::Vertex&);
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
-  bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError);
-  bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
-  bool vertex_time_from_tracks_pid_newton(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
+  static bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
+  static bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
+  static bool vertex_time_from_tracks_pid_newton(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
+
+  bool vertex_time_from_tracks_analysis(bool time_method(const reco::Vertex&,
+                                                       Tracks& ,
+						       double ,
+                                                       double& ,
+						       double&, 
+						        bool),
+					const MVertex & v,
+					Tracks& tracks,
+					double minquality,
+					const SimEvent &,
+					const std::string label, 
+					std::map<std::string, TH1*>& h,
+					const std::string vtype,
+					bool verbose=false);
 
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);

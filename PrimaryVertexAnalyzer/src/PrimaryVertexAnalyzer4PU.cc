@@ -1860,31 +1860,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
       addnSP(h, new TH1F("ntimingvtx", "#timing tracks", 200, 0., 200.));
       addnSP(h, new TH1F("ntimingqual05vtx", "#timing tracks above quality threshold 0.5", 200, 0., 200.));
       addnSP(h, new TH1F("ntimingqual08vtx", "#timing tracks above quality threshold 0.8", 200, 0., 200.));
-      addnSP(h, new TH1F("trecsim_fromtracks", "vertex time residual from tracks", 200, -0.1, 0.1));
-      addnSP(h, new TH1F("trecerr_fromtracks", "vertex time error from tracks", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_fromtracks", "tpull from tracks", 200, -10., 10.));
-      addnSP(h, new TH1F("trecsim_fromtracks_qual", "vertex time residual from tracks with quality", 200, -0.1, 0.1));
-      addnSP(h, new TH1F("trecerr_fromtracks_qual", "vertex time error from tracks with quality", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_fromtracks_qual", "tpull from tracks with quality", 200, -10., 10.));
-      addnSP(h, new TH1F("trecsim_fromtracks_pid", "vertex time residual from tracks (pid)", 200, -0.1, 0.1));
-      addnSP(h, new TH1F("trecerr_fromtracks_pid", "vertex time error from tracks (pid)", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_fromtracks_pid", "tpull from tracks (pid)", 200, -10., 10.));
-      addnSP(h, new TH1F("trecsim_fromtracks_qual_pid", "vertex time residual from tracks with quality (pid)", 200, -0.1, 0.1));
-      addnSP(h, new TH1F("trecerr_fromtracks_qual_pid", "vertex time error from tracks with quality (pid)", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_fromtracks_qual_pid", "tpull from tracks with quality (pid)", 200, -10., 10.));
-      addnSP(h,
-	     new TH1F("trecsim_withtracks", "vertex time residual from vertex ", 200, -0.1, 0.1));  //reference for fromtracks
-      addnSP(h, new TH1F("trecerr_withtracks", "vertex time error from vertex", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_withtracks", "tpull from vertex", 200, -10., 10.));
-      addnSP(h,
-	     new TH1F("trecsim_withtracks_pid", "vertex time residual from vertex (pid)", 200, -0.1, 0.1));  //reference for fromtracks_pid
-      addnSP(h, new TH1F("trecerr_withtracks_pid", "vertex time error from vertex (pid)", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_withtracks_pid", "tpull from vertex (pid)", 200, -10., 10.));
-      addnSP(h,
-	     new TH1F("trecsim_withtracks_qual_pid", "vertex time residual from vertex (pid)", 200, -0.1, 0.1));  //reference for fromtracks_pid
-      addnSP(h, new TH1F("trecerr_withtracks_qual_pid", "vertex time error from vertex (pid)", 500, 0., 0.1));
-      addnSP(h, new TH1F("trecsimpull_withtracks_qual_pid", "tpull from vertex (pid)", 200, -10., 10.));
-      
+
       addnSP(h, new TH1F("trecsim","trec - tsim", 200, -0.1, 0.1));
       addnSP(h, new TH1F("trecsimpull","(trec - tsim)/error", 100, -10, 10));
       addnSP(h, new TH1F("trecsimpullwide","(trec - tsim)/error", 100, -20, 20));
@@ -1896,6 +1872,18 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
       addnSP(h, new TH1F("trecsimpull_sigmatlt01", "tpull from vertex (sigma_t lt 0.1)", 200, -10., 10.));
       addnSP(h, new TH2F("trecsimpullvserr", "tpull from vertex vs terr", 50, 0., 0.05, 200, -10., 10.));
       addnSP(h, new TProfile("trecsimpullsqvserr", "tpull**2 from vertex vs terr", 50, 0., 0.05, 0., 100.));
+
+      // for the various vertex_time_fromtracks versions
+      vector<string> suffixes = {"","_qual","_pid","_qual_pid", "_qual_pid_new"};
+      for(auto & suffix : suffixes){
+	addnSP(h, new TH1F(("trecsim_fromtracks" + suffix).c_str(), ("vertex time residual from tracks "+ suffix).c_str(), 200, -0.1, 0.1));
+	addnSP(h, new TH1F(("trecerr_fromtracks" + suffix).c_str(), ("vertex time error from tracks"+ suffix).c_str(), 500, 0., 0.1));
+	addnSP(h, new TH1F(("trecsimpull_fromtracks" + suffix).c_str(), ("tpull from tracks" + suffix).c_str(), 200, -10., 10.));
+	//references, vertex time for the same set of vertices
+	addnSP(h, new TH1F(("trecsim_withtracks" + suffix).c_str(), ("vertex time residual from vertex " + suffix).c_str(), 200, -0.1, 0.1)); 
+	addnSP(h, new TH1F(("trecerr_withtracks" + suffix).c_str(), ("vertex time error from vertex" + suffix).c_str(), 500, 0., 0.1));
+	addnSP(h, new TH1F(("trecsimpull_withtracks" + suffix).c_str(), ("tpull from vertex" + suffix).c_str(), 200, -10., 10.));
+      }
     }
     dir->cd();
   }// vtypes
@@ -2056,10 +2044,10 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
     addnSP(h, new TH2F("tktrecsimpullvserr", "(trec-tsim)/terr vs terr", 50, 0., 0.5, 50, 0., 100.0));
     addnSP(h, new TProfile("tkzrecsimvslogpt",   "(zrec-zsim) vs log pt", 100, -1., 5., -pull_cut_off, pull_cut_off));
 
-    addnSP(h, new TH2F("tkpidvsetalogpt", "all particle types", netabin, -etarange, etarange, 60, -1., 5));
-    addnSP(h, new TH2F("tkpidpionvsetalogpt", "pions", netabin, -etarange, etarange, 60, -1., 5));
-    addnSP(h, new TH2F("tkpidkaonvsetalogpt", "kaons", netabin, -etarange, etarange, 60, -1., 5));
-    addnSP(h, new TH2F("tkpidprotonvsetalogpt", "protons", netabin, -etarange, etarange, 60, -1., 5));
+    addnSP(h, new TH2F("tkpidvsetalogpt", "all particle types", netabin/2, 0, etarange, 30, -1., 2.));
+    addnSP(h, new TH2F("tkpidpionvsetalogpt", "pions", netabin/2, 0, etarange, 30, -1., 2.));
+    addnSP(h, new TH2F("tkpidkaonvsetalogpt", "kaons", netabin/2, 0, etarange, 30, -1., 2.));
+    addnSP(h, new TH2F("tkpidprotonvsetalogpt", "protons", netabin/2, 0, etarange, 30, -1., 2.));
     dir->cd();
   }  // track types
   
@@ -4180,7 +4168,8 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
                                                        Tracks& tracks,
 						       double minquality,
                                                        double& t,
-                                                       double& tError) {
+                                                       double& tError,
+						       bool verbose) {
   double tsum = 0;
   double wsum = 0;
   double w2sum = 0;
@@ -4334,7 +4323,7 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	  }
 	if (wsum < 1e-10)
 	  {
-	    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed while iterating", 10);
+	    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed while iterating", 10);
 	    return false;
 	  }
 
@@ -4395,9 +4384,9 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	t0 = t;
 
       }
-    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed to converge", 10);
+    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed to converge", 10);
   }else{
-    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid has no track timing info", 10);
+    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid has no track timing info", 10);
   }
   t = 0;
   tError = 1.e10;
@@ -4596,13 +4585,58 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton(const reco::Ve
 	t0 = t;
 
       }
-    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton failed to converge", 10);
+    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton failed to converge", 10);
   }else{
-    report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton has no track timing info", 10);
+    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton has no track timing info", 10);
   }
   t = 0;
   tError = 1.e10;
   return false;
+}
+
+
+
+bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_analysis(bool time_method(const reco::Vertex&,
+										 Tracks& ,
+										 double ,
+										 double& ,
+										 double&, 
+										 bool ), 
+								const MVertex & v,
+								Tracks& tracks,
+								double minquality,
+								const SimEvent & simevt, 
+								const string label,
+								std::map<std::string, TH1*>& h,
+								const string vtype, 
+								bool verbose){
+  string suffix = (label=="") ? label : "_"+label;
+  
+  string timer_label = "vertex_time_fromtracks" + suffix;
+  timer_start(timer_label);
+  double t, tError;
+  bool success = time_method(*(v.recvtx), tracks, minquality, t, tError, verbose);
+  timer_stop(timer_label);
+
+
+  if (success)
+    {
+      // timing from tracks
+      Fill(h, vtype + "/trecsim_fromtracks" + suffix, t - simevt.t, simevt.is_signal());
+      Fill(h, vtype + "/trecerr_fromtracks" + suffix, tError, simevt.is_signal());
+      Fill(h, vtype + "/trecsimpull_fromtracks" +suffix, (t - simevt.t) / tError, simevt.is_signal());
+      
+      // also fill histos with the default values for the same list of vertices for comparison
+      Fill(h, vtype + "/trecsim_withtracks" + suffix, v.t() - simevt.t, simevt.is_signal());
+      Fill(h, vtype + "/trecerr_withtracks" + suffix, v.tError(), simevt.is_signal());
+      Fill(h, vtype + "/trecsimpull_withtracks" + suffix, (v.t() - simevt.t) / v.tError(), simevt.is_signal());
+    }
+  else
+    {
+      report_counted("fillVertexHistosMatched: "+label+ " timing from tracks failed",1);
+    }
+  
+  return success;
 }
 
 
@@ -5069,20 +5103,12 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       Fill(h, vtype + "/ntimingvtx", float(ntiming), simevt.is_signal());
       Fill(h, vtype + "/ntimingqual05vtx", float(ntiming_qual05), simevt.is_signal());
       Fill(h, vtype + "/ntimingqual08vtx", float(ntiming_qual08), simevt.is_signal());
-      
-      double t_fromtracks, tError_fromtracks;
-      bool timing_from_tracks = vertex_time_from_tracks(v.recovertex(), tracks, 0, t_fromtracks, tError_fromtracks);
 
-      double t_fromtracks_qual, tError_fromtracks_qual;
-      bool timing_from_tracks_qual = vertex_time_from_tracks(v.recovertex(), tracks, 0.8, t_fromtracks_qual, tError_fromtracks_qual);
-
-      double t_fromtracks_pid, tError_fromtracks_pid;
-      timer_start("vertex_time_from_tracks_pid");
-      bool timing_from_tracks_pid = vertex_time_from_tracks_pid(*(v.recvtx), tracks, 0, t_fromtracks_pid, tError_fromtracks_pid);
-      timer_stop("vertex_time_from_tracks_pid");
-
-      double t_fromtracks_qual_pid, tError_fromtracks_qual_pid;
-      bool timing_from_tracks_qual_pid = vertex_time_from_tracks_pid_newton(*(v.recvtx), tracks, 0.8, t_fromtracks_qual_pid, tError_fromtracks_qual_pid);
+      vertex_time_from_tracks_analysis(vertex_time_from_tracks, v, tracks, 0., simevt, "", h, vtype);
+      vertex_time_from_tracks_analysis(vertex_time_from_tracks, v, tracks, 0.8, simevt, "qual", h, vtype);
+      vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0. , simevt, "pid", h, vtype);
+      vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0.8, simevt, "qual_pid", h, vtype);
+      vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype);
 
       double tsim = simevt.t;
       Fill(h, vtype + "/trecsim", v.t() - tsim, simevt.is_signal());
@@ -5095,76 +5121,7 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
 	Fill(h, vtype + "/trecsim_sigmatlt01", v.t() - tsim, simevt.is_signal());
 	Fill(h, vtype + "/trecsimpull_sigmatlt01", (v.t() - tsim) / v.tError(), simevt.is_signal());
       }
-      
-      if (timing_from_tracks)
-	{
-	  // timing from tracks
-	  Fill(h, vtype + "/trecsim_fromtracks" , t_fromtracks - simevt.t, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_fromtracks", tError_fromtracks, simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_fromtracks", (t_fromtracks - simevt.t) / tError_fromtracks, simevt.is_signal());
-
-	  // also fill histos with the default values for the same list of vertices for comparison
-	  Fill(h, vtype + "/trecsim_withtracks", v.t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_withtracks", v.tError(), simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_withtracks", (v.t() - tsim) / v.tError(), simevt.is_signal());
-	}
-      else
-	{
-	  report_counted("fillVertexHistosMatched: timing from tracks failed",1);
-	}
-
-      if (timing_from_tracks_qual)
-	{
-	  // timing from tracks
-	  Fill(h, vtype + "/trecsim_fromtracks_qual" , t_fromtracks_qual - simevt.t, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_fromtracks_qual", tError_fromtracks_qual, simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_fromtracks_qual", (t_fromtracks_qual - simevt.t) / tError_fromtracks_qual, simevt.is_signal());
-
-	  // also fill histos with the default values for the same list of vertices for comparison
-	  Fill(h, vtype + "/trecsim_withtracks", v.t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_withtracks", v.tError(), simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_withtracks", (v.t() - tsim) / v.tError(), simevt.is_signal());
-	}
-      else
-	{
-	  report_counted("fillVertexHistosMatched: timing from tracks with quality failed",1);
-	}
-
-      if (timing_from_tracks_pid)
-	{
-	  // timing from tracks
-	  Fill(h, vtype + "/trecsim_fromtracks_pid" , t_fromtracks_pid- simevt.t, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_fromtracks_pid", tError_fromtracks_pid, simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_fromtracks_pid", (t_fromtracks_pid - simevt.t) / tError_fromtracks_pid, simevt.is_signal());
-
-	  // also fill histos with the default values for the same list of vertices for comparison
-	  Fill(h, vtype + "/trecsim_withtracks_pid", v.t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_withtracks_pid", v.tError(), simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_withtracks_pid", (v.t() - tsim) / v.tError(), simevt.is_signal());
-	}
-      else
-	{
-	  report_counted("fillVertexHistosMatched: pid timing from tracks failed",1);
-	}
-
-      
-      if (timing_from_tracks_qual_pid)
-	{
-	  // timing from tracks
-	  Fill(h, vtype + "/trecsim_fromtracks_qual_pid" , t_fromtracks_qual_pid - simevt.t, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_fromtracks_qual_pid", tError_fromtracks_qual_pid, simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_fromtracks_qual_pid", (t_fromtracks_qual_pid - simevt.t) / tError_fromtracks_qual_pid, simevt.is_signal());
-
-	  // also fill histos with the default values for the same list of vertices for comparison
-	  Fill(h, vtype + "/trecsim_withtracks_qual_pid", v.t() - tsim, simevt.is_signal());
-	  Fill(h, vtype + "/trecerr_withtracks_qual_pid", v.tError(), simevt.is_signal());
-	  Fill(h, vtype + "/trecsimpull_withtracks_qual_pid", (v.t() - tsim) / v.tError(), simevt.is_signal());
-	}
-      else
-	{
-	  report_counted("fillVertexHistosMatched: pid timing from tracks with quality failed",1);
-	}
-    }
+    }// 4D
 }
 /***************filvertexhistosMatched**********************************************************************/
 
@@ -5188,7 +5145,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h, c
 
   if (v != NULL && v->isValid() && v->ndof() > 10.) {
     double zvtx = v->position().z();
-    double dz2 = tk.dz() * tk.dz() + (pow(wx_ * cos(tk.phi()), 2) + pow(wy_ * sin(tk.phi()), 2)) / pow(tan(tk.theta()), 2); // really?
+    double dz2 = tk.dzError() * tk.dzError() + (pow(wx_ * cos(tk.phi()), 2) + pow(wy_ * sin(tk.phi()), 2)) / pow(tan(tk.theta()), 2); // really?
     Fill(h, ttype + "/zrestrk", tk.z() - zvtx);
     Fill(h, ttype + "/zrestrkvsphi", tk.phi(), tk.z() - zvtx);
     Fill(h, ttype + "/zrestrkvseta", tk.eta(), tk.z() - zvtx);
@@ -5353,7 +5310,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
   auto const rec_eta = tk.eta();
   auto const rec_phi = tk.phi();
   auto const rec_z = tk.z();
-  auto const rec_dz = tk.dz();
+  auto const rec_dz = tk.dzError();
 
   auto const sim_pt = tk._tpr->pt();
   auto const sim_eta = tk._tpr->eta();
@@ -5408,13 +5365,15 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistosMatched(std::map<std::string, TH1*
     Fill(h, ttype + "/tktrecsimpullsqvserr", rec_dt, dtPull2, isSignalPV);
     Fill(h, ttype + "/tktrecsimpullvserr", rec_dt, dtPull, isSignalPV);
 
-    Fill(h, ttype + "/tkpidvsetalogpt", rec_eta, log(rec_pt)/log(10.));
-    if (tk.is_pion()){
-      Fill(h, ttype + "/tkpidpionvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+
+    
+    Fill(h, ttype + "/tkpidvsetalogpt", std::abs(rec_eta), log(rec_pt)/log(10.));
+    if (tk.is_pion() || tk.is_muon()){
+      Fill(h, ttype + "/tkpidpionvsetalogpt", std::abs(rec_eta), log(rec_pt)/log(10.));
     }else if(tk.is_kaon()){
-      Fill(h, ttype + "/tkpidkaonvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+	Fill(h, ttype + "/tkpidkaonvsetalogpt", std::abs(rec_eta), log(rec_pt)/log(10.));
     }else if(tk.is_proton()){
-      Fill(h, ttype + "/tkpidprotonvsetalogpt", rec_eta, log(rec_pt)/log(10.));
+	Fill(h, ttype + "/tkpidprotonvsetalogpt", std::abs(rec_eta), log(rec_pt)/log(10.));
     }
 
   }
@@ -5872,10 +5831,10 @@ void PrimaryVertexAnalyzer4PU::analyzeTracksTP(Tracks& tracks, std::vector<SimEv
 
       double logpt = log(tk.pt()) / log(10.);
       unsigned int bin = 4;
-      if (tk.dz() <= 0.01) {bin =0;}
-      else if (tk.dz() < 0.02) { bin = 1; }
-      else if (tk.dz() < 0.05) { bin = 2; }
-      else if (tk.dz() < 0.10) { bin = 3; }
+      if (tk.dzError() <= 0.01) {bin =0;}
+      else if (tk.dzError() < 0.02) { bin = 1; }
+      else if (tk.dzError() < 0.05) { bin = 2; }
+      else if (tk.dzError() < 0.10) { bin = 3; }
       else { bin = 4;}
       const char * sbin = trkdzbin_[bin].c_str();
       
@@ -6007,7 +5966,7 @@ void PrimaryVertexAnalyzer4PU::printPVTrksZT(Tracks & tracks,
     double tz = tk.z();
     double tantheta = tan(tk.theta());
     double phi = tk.phi();
-    double tdz2 = pow(tk.dz(), 2) + (pow(wx_ * cos(phi), 2) + pow(wy_ * sin(phi), 2)) / pow(tantheta, 2);
+    double tdz2 = pow(tk.dzError(), 2) + (pow(wx_ * cos(phi), 2) + pow(wy_ * sin(phi), 2)) / pow(tantheta, 2);
 			  
     // print vertices in between tracks
     int iiv = 0;
@@ -6307,7 +6266,7 @@ void PrimaryVertexAnalyzer4PU::getTc(
   for(auto tk : tracks){
     double tantheta = tan(tk.theta());
     double z = tk.z();
-    double dz2 = pow(tk.dz(), 2) + pow(vertexBeamSpot_.BeamWidthX() / tantheta, 2);
+    double dz2 = pow(tk.dzError(), 2) + pow(vertexBeamSpot_.BeamWidthX() / tantheta, 2);
     double w = 1. / dz2;  // take p=1
     sumw += w;
     sumwz += w * z;
@@ -6538,7 +6497,7 @@ std::vector<PrimaryVertexAnalyzer4PU::SimEvent> PrimaryVertexAnalyzer4PU::getSim
 	 << " vy="  << cand.vy()
 	 << " vz="  << cand.vz()
 	 << " dxy="  << cand.dxy()
-	 << " dz="  << cand.dz()                  
+	 << " dz="  << cand.dzError()                  
 	 << " chi2="  << cand.vertexChi2()         // always 0
       	 << " ndau"  << cand.numberOfDaughters()  // always = 0
       	 << " nmo" << cand.numberOfMothers()      //  always =1
@@ -8417,7 +8376,7 @@ void PrimaryVertexAnalyzer4PU::signalvtxmatch(MVertexCollection & vertexes, std:
         if (tk->matched() && (tk->_simEvt == &ev)) {
           double dz2_beam = pow(vertexBeamSpot_.BeamWidthX() * cos(tk->phi()) / tan(tk->theta()), 2) +
 	    pow(vertexBeamSpot_.BeamWidthY() * sin(tk->phi()) / tan(tk->theta()), 2);
-          double dz2 = pow(tk->dz(), 2) + dz2_beam + pow(0.0020, 2); // added 20 um, some tracks have crazy small resolutions
+          double dz2 = pow(tk->dzError(), 2) + dz2_beam + pow(0.0020, 2); // added 20 um, some tracks have crazy small resolutions
           double wos = v.trackWeight(tk) / dz2;
           if (f4D_ && tk->has_timing() && (tk->dt() > 0)) {
             wos = wos / erf(tk->dt() / sigmaT_);
@@ -9286,7 +9245,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 	if(vtxs[iv].is_signal()){
 	  // signal
 	  for( auto tv : vtxs(iv).tracks){
-	    if (tv->dz() < 0.01) {
+	    if (tv->dzError() < 0.01) {
 	      fillTrackHistos(h, "matchedsignalvtxseldriver", *tv, vtxs(iv).recvtx);
 	    }
 	  }
@@ -9326,7 +9285,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
 	  reportEvent(Form("split signal vertex selected at index [%d]", iv), false);
 
 	  for (auto tv : vtxs(iv).tracks){
-	    if (tv->dz() < 0.0100) {
+	    if (tv->dzError() < 0.0100) {
 	      fillTrackHistos(h, "splitvtxselfromsignaldriver", *tv, vtxs(iv).recvtx);
 	    }
 	  }
@@ -9800,11 +9759,11 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
   for (auto v : vtxs){
     for (auto tv : v.tracks){
       if (v.is_real()) {
-        if (tv->dz() < 0.01) {
+        if (tv->dzError() < 0.01) {
           fillTrackHistos(h, "realvtxdriver", *tv, v.recvtx);
         }
       } else {
-        if (tv->dz() < 0.01) {
+        if (tv->dzError() < 0.01) {
           fillTrackHistos(h, "fakevtxdriver", *tv, v.recvtx);
         }
       }
@@ -9889,7 +9848,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionPtvis(std::map<std::string
 	px[1] += tkpx;
 	py[1] += tkpy;
       }
-      double zpull = (tk.z() - zvtx) / tk.dz();
+      double zpull = (tk.z() - zvtx) / tk.dzError();
       if (fabs(zpull) < 3.){
 	ptvis[2] += tk.pt();
 	px[2] += tkpx;
@@ -9905,7 +9864,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionPtvis(std::map<std::string
 	      w3 = 0;
 	    }
 	      
-	    double p = (vtxs(iv).z() - tk.z()) / tk.dz();
+	    double p = (vtxs(iv).z() - tk.z()) / tk.dzError();
 	    if (fabs(p) < 5.)
 	      {
 		Z4 +=  exp(-0.5* p * p);
@@ -10355,10 +10314,10 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
 	}      
       }
   
-      if((abs(tk.z()) < 4) && (tk.dz() < 0.01) && (abs(tk.eta()) > 1.4) && (abs(tk.eta()) < 1.8)){
+      if((abs(tk.z()) < 4) && (tk.dzError() < 0.01) && (abs(tk.eta()) > 1.4) && (abs(tk.eta()) < 1.8)){
 	fillTrackHistos(h, "highetadriver", tk, pv0_ptr);
       }
-      if((abs(tk.z()) < 4) && (tk.dz() < 0.01)){
+      if((abs(tk.z()) < 4) && (tk.dzError() < 0.01)){
 	fillTrackHistos(h, "alletadriver", tk, pv0_ptr);
       }
 
