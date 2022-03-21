@@ -4164,15 +4164,17 @@ double PrimaryVertexAnalyzer4PU::vertex_aptsum(const reco::Vertex& v) {
   return aptsum;
 }
 
-bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
+PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
                                                        Tracks& tracks,
 						       double minquality,
-                                                       double& t,
-                                                       double& tError,
 						       bool verbose) {
+
+  PrimaryVertexAnalyzer4PU::Vertex_time_result result;
+
   double tsum = 0;
   double wsum = 0;
   double w2sum = 0;
+  double t;
   for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
     if (v.trackWeight(*tk) > 0.5) {
       auto trk = tracks.from_ref(*tk);
@@ -4218,27 +4220,27 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks(const reco::Vertex& v,
 	    t = tsum / wsum;
 	    if (fabs(t - t0) < 1e-3)
 	      {
-		tError = sqrt(w2sum) / wsum;
-		return true;
+		//tError = sqrt(w2sum) / wsum;
+		result.success(tsum / wsum, sqrt(w2sum)/ wsum, nit);
+		return result;
 	      }
 	  }
 	t0 = t;
       }
   }
-  t = 0;
-  tError = 1.e10;
-  return false;
+  return result;
 }
 
 
-bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v,
+PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v,
 							   Tracks& tracks,
 							   double minquality,
-							   double& t,
-							   double& tError, bool verbose) {
+							   bool verbose) {
+  PrimaryVertexAnalyzer4PU::Vertex_time_result result;
   double tsum = 0;
   double wsum = 0;
   double w2sum = 0;
+  double t;
 
   if(verbose) {
     cout << "vertex_time_from_tracks_pid vtx x=" << v.x()
@@ -4324,7 +4326,7 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	if (wsum < 1e-10)
 	  {
 	    //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed while iterating", 10);
-	    return false;
+	    return result;
 	  }
 
 	t = tsum / wsum;
@@ -4365,7 +4367,7 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 	}
 	if ((fabs(t - t0) < 1e-4 / sqrt(beta)) && (beta >= 1.))
 	  {
-	    tError = sqrt(w2sum) / wsum;
+	    double tError = sqrt(w2sum) / wsum;
 	    if(verbose) {
 	      cout << "vertex_time_from_tracks_pid         minquality=" << minquality 
 		   << " tfit = " << t << " +/- " << tError
@@ -4373,7 +4375,8 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 		   << " iteration " <<  nit;
 	      cout << endl;
 	    }
-	    return true;
+	    result.success(t, tError, nit);
+	    return result;
 	  }
 	
 	if ((fabs(t - t0) < 1e-3) && ((beta < 1.)))
@@ -4385,152 +4388,171 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid(const reco::Vertex& v
 
       }
     //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid failed to converge", 10);
+    result.status = 3;
   }else{
     //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid has no track timing info", 10);
+    result.status = 2;
   }
-  t = 0;
-  tError = 1.e10;
-  return false;
+  return result;
 }
 
 
-bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton(const reco::Vertex& v,
+
+
+PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton(const reco::Vertex& v,
 							   Tracks& tracks,
-							   double minquality,
-							   double& t,
-							   double& tError, bool verbose) {
+							   double minquality, 
+							   bool verbose) {
   /* determine the vertex time and best mass assignment using annealing 
      this version applies a Newton method to minimize F
   */
-  double tsum = 0;
-  double wsum = 0;
-  double w2sum = 0;
+  PrimaryVertexAnalyzer4PU::Vertex_time_result result;
+  double t;
 
-  double a[3] = {0.7,0.2,0.1};  // prior probabilities of mass hypotheses, FIXME : to be determined
+  bool lverbose = verbose;
+  double a_hyp[3] = {0.7,0.2,0.1};  // prior probabilities of mass hypotheses, FIXME : to be determined
   constexpr double cooling_factor = 0.5;
+  constexpr double cut_off = 3.;
+
+
   // initial guess
+  double S0 = 0, S1 = 0;
+  double S0p = 0, S1p = 0, S2p = 0;
   for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
     if (v.trackWeight(*tk) > 0.5) {
       auto trk = tracks.from_ref(*tk);
       if (trk.has_timing() && (trk.timeQuality() >= minquality)) {
-	double w = v.trackWeight(*tk) / (trk.MTD_timeerror()*trk.MTD_timeerror());
-        wsum += w;
+	double q = 1. / (trk.MTD_timeerror()*trk.MTD_timeerror());
+	double w = v.trackWeight(*tk) *q;
+	double wp = w * q;
+        S0 += w;
+	S0p += wp;
 	for(unsigned int j=0; j < 3; j++){
-	  tsum += w * trk.th[j] * a[j];
+	  S1  += w  * a_hyp[j] * trk.th[j];
+	  S1p += wp * a_hyp[j] * trk.th[j];
+	  S2p += wp * a_hyp[j] * trk.th[j] * trk.th[j];
 	}
       }
     }
   }
+  double t0 = 0;
+  double Tmax = 512.;
+  double beta = 1 / Tmax;
+  if (S0 > 0) {
+    t0 = S1 / S0;
+    Tmax = (S2p - 2*t0 * S1p + S0p * t0 * t0) / S0;
+    int coolingsteps = 1 - int(std::log(Tmax) / std::log(cooling_factor));
+    beta = std::pow(cooling_factor, coolingsteps);
 
-  
-  if (wsum > 0) {
 
-    if(verbose) {
+    if(lverbose) {
       cout << "vertex_time_from_tracks_pid_newton  minquality=" << minquality 
-	   << " wsum = " << wsum 
-	   << " tsum = " << tsum 
-	   << " t0 = " << (wsum > 0 ? tsum/wsum : 0)
-	   << " trec = " << v.t();
+	 << " sum(w) = " << S0 
+	 << " sum(t) = " << S1
+	 << " t0 = " << (S0 > 0 ? S1 / S0 : 0)
+	 << " trec = " << v.t()
+	 << " Tmax = " << Tmax
+	 << " Tstart = " << 1/beta;
       cout << endl;
     }
 
-    double t0 = tsum / wsum;
+
+
     int nit = 0;
     int nit_newt = 0;
-    double beta = 1./256.;
+    double beta0 = beta / cooling_factor;  // previous temperature
+    double Z0 = exp(-beta * 0.5* cut_off* cut_off); // update when T changes
+    double F0 = 1, F1 = 0, F2 = 0;
+    double Sw2 = 0;
+    double Sdtwprime = 0;
+
     while ( (nit++) < 100)
       {
-	tsum = 0;
-	wsum = 0;
-	w2sum = 0;
-	double F0 = 1.; // really exp(-beta F0), temporary
-	double F1 = 0;  // dF/dt
-	double F2 = 0;  // d2F/dt2
-	double Z0 = exp(-beta * 0.5* 3.* 3.); // actually only needs to be changed when T changes
-	// evaluate F at two neighbouring points, too
-	double tw = 0.030 / sqrt(beta);
-	double F0_p = 1, wsum_p=0, tsum_p = 0, F0_m = 1, wsum_m=0, tsum_m=0, F0_0 = 1, wsum_0=0, tsum_0=0;
-	for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
-	  {
-	    if (v.trackWeight(*tk) > 0.5)
-	      {
-		auto trk = tracks.from_ref(*tk);
-		if (trk.has_timing() && (trk.timeQuality() >= minquality))
-		  {
-		    double dt = trk.MTD_timeerror();
-		    // neighbours
-		    double tsum_trk_0 = 0, wsum_trk_0 = 0;
-		    double tsum_trk_m = 0, wsum_trk_m = 0;
-		    double tsum_trk_p = 0, wsum_trk_p = 0;
-		    for(unsigned int j = 0; j < 3; j++){
-		      wsum_trk_0 += a[j] * exp(- 0.5 * beta * (trk.th[j] - t0) *  (trk.th[j] - t0) / (dt*dt));
-		      tsum_trk_0 += a[j] * exp(- 0.5 * beta * (trk.th[j] - t0) *  (trk.th[j] - t0)/ (dt*dt)) * trk.th[j];
-		      double w_m = a[j] * exp(- 0.5 * beta * (trk.th[j] - (t0-tw)) *  (trk.th[j] - (t0-tw))/ (dt*dt));
-		      tsum_trk_m += w_m * trk.th[j];
-		      wsum_trk_m += w_m;
-		      double w_p = a[j] * exp(- 0.5 * beta * (trk.th[j] - (t0+tw)) *  (trk.th[j] - (t0+tw))/ (dt*dt));
-		      tsum_trk_p += w_p * trk.th[j];
-		      wsum_trk_p += w_p;
-		    }
-		    F0_0 *= (Z0 + wsum_trk_0);
-		    tsum_0 += v.trackWeight(*tk) * tsum_trk_0 / ((Z0 + wsum_trk_0) *dt *dt);
-		    wsum_0 += v.trackWeight(*tk) * wsum_trk_0 / ((Z0 + wsum_trk_0) *dt *dt);
-		    double Z_m = Z0 + wsum_trk_m;
-		    F0_m *= Z_m;
-		    tsum_m += v.trackWeight(*tk) * tsum_trk_m / (Z_m * dt *dt);
-		    wsum_m += v.trackWeight(*tk) * wsum_trk_m / (Z_m * dt *dt);
-		    double Z_p = Z0 + wsum_trk_p;
-		    F0_p *= Z_p;
-		    tsum_p += v.trackWeight(*tk) * tsum_trk_p / (Z_p * dt *dt);
-		    wsum_p += v.trackWeight(*tk) * wsum_trk_p / (Z_p * dt *dt);
 
-		    // central
-		    double Z = Z0;
-		    double S0 = 0;
-		    double S1 = 0;
-		    double S2 = 0;
-		    double tsum_trk = 0;
-		    double wsum_trk = 0;
-		    for(unsigned int j = 0; j < 3; j++){
-		      double difftij = (trk.th[j] - t0);
-		      double tpull =  difftij / dt;
-		      double ae = a[j] * exp(- 0.5 * beta * tpull * tpull);
-		      Z +=  ae;
-		      double wZ = ae / (dt * dt);  // like w_ij, but lacks the 1/Z
-		      S0 += wZ;
-		      S1 += difftij * wZ;
-		      S2 += tpull * tpull * wZ;
-		      tsum_trk += wZ * trk.th[j];
-		      wsum_trk += wZ;
+	unsigned int nT = 0;
+	while(nT++ < 10){ // may have to repeat after T-changes if we did not end up in a minimum
+	  S1 = 0;
+	  S0 = 0; 
+	  F0 = 1.; // really exp(-beta F0), temporary, not necessarily needed
+	  Sw2 = 0;
+	  Sdtwprime = 0;
+	  for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
+	    {
+	      if (v.trackWeight(*tk) > 0.5)
+		{
+		  auto trk = tracks.from_ref(*tk);
+		  if (trk.has_timing() && (trk.timeQuality() >= minquality))
+		    {
+		      double sigmat_trk = trk.MTD_timeerror();
+		      double sigmat_trk_sq = sigmat_trk * sigmat_trk;
+		      
+		      double ae_hyp[3] = {0,0,0};
+		      double deltat_hyp[3];
+		      double Z_trk = Z0;
+		      for(unsigned int j = 0; j < 3; j++){
+			deltat_hyp[j] = trk.th[j] - t0;
+			ae_hyp[j] = a_hyp[j] * exp(- 0.5 * beta * deltat_hyp[j] * deltat_hyp[j] / sigmat_trk_sq);
+			Z_trk += ae_hyp[j];
+		      }
+		      
+		      double Sdt2w_trk = 0, S0_trk = 0, S1_trk = 0, S0w_trk = 0;
+		      double one_over_Z_sigma_sq = 1./(Z_trk * sigmat_trk_sq);
+		      for(unsigned int j = 0; j < 3; j++){
+			double w_hyp = ae_hyp[j] * one_over_Z_sigma_sq ;
+			S0_trk += w_hyp;
+			S1_trk += w_hyp * trk.th[j];
+			S0w_trk += w_hyp * w_hyp;            // needed for error calculation only
+			Sdt2w_trk += deltat_hyp[j] * deltat_hyp[j] * w_hyp;
+		      }
+		      S0  += v.trackWeight(*tk) * S0_trk;
+		      S1  += v.trackWeight(*tk) * S1_trk;
+		      Sw2 += v.trackWeight(*tk) * S0w_trk * sigmat_trk_sq; // error calculation only
+		      auto Sdtw_trk = S1_trk - t0 * S0_trk;
+		      Sdtwprime += v.trackWeight(*tk) * Sdt2w_trk / sigmat_trk_sq - Sdtw_trk * Sdtw_trk;
+		      
+		      F0 *= Z_trk;
 		    }
-		    double woZ = v.trackWeight(*tk) / Z;
-		    wsum +=  woZ * wsum_trk;
-		    w2sum += woZ * wsum_trk * wsum_trk * (dt * dt) / Z;
-		    tsum +=  woZ * tsum_trk;
+		}
+	    }
+	  
+	  Sdtwprime *= beta; 
+	  F1 = t0 * S0 - S1;
+	  F2 = S0 - Sdtwprime;
 
-		    S1 = S1 / Z; // S0,S2 are divided by Z in the F2 expression
-		    F0 *=  Z;
-		    F1 += -v.trackWeight(*tk)  * S1 ;
-		    F2 +=  v.trackWeight(*tk) * (beta * S1 * S1 + (S0 - beta * S2) / Z);
-		  }
-	      }
+	  if (( F2 < 0 ) && (beta > beta0)){
+	    if(lverbose){std::cout << "T-step rejected  " << nT << "   T(try) = " << 1/beta << "   F2="   << F2 << "  Tnew =  " << 1/sqrt(beta * beta0) <<  "  T0=" << 1/beta0<< std::endl;}
+	    // T-step too big ?
+	    beta = sqrt(beta * beta0);
+	    Z0 = exp(-beta * 0.5 * cut_off * cut_off);
+	  }else{
+	    break; // T-step accepted
 	  }
-	//cout << "Ytest " << nit <<  " )T=" << 1/beta << "  t0 = " << t0 << "  tnewt=" <<  t0 - F1 / F2 << "  tc " << tsum/wsum << " t- =" << tsum_m/wsum_m << " t+= " << tsum_p / wsum_p << "   F =  " << -log(F0_m)/beta << " " << -log(F0)/beta << " " << -log(F0_p)/beta <<  "  F00=" <<  -log(F0_0)/beta << endl;
 
-	// apply Newton only in valleys (F2>0) and avoid large steps
-	if((F0_m > F0) && (F0_m > F0_p)){
-	  t = tsum_m / wsum_m;
-	}else if ((F0_p > F0) && (F0_p > F0_m)){
-	  t = tsum_p / wsum_p;
-	}else if( F2 > 10. * abs(F1) ){ 
-	  t = t0 - F1 / F2;
-	  nit_newt++;
-	}else{
-	  t = tsum / wsum;
+	} // one more time
+
+	// T-step accepted (or gave up)
+
+	double dF_rose = -F1*F1 / S0;
+	double dF_newt = -F1*F1 / F2; // same as t0 - F1/F2 
+	double t_rose = S1 / S0;
+	double t_newt = (S1 - t0 * Sdtwprime) / (S0 - Sdtwprime);// same as t0 - F1/F2 
+	if(lverbose){
+	  std::cout << " t_rose = " << t_rose << " t_newton = " << t_newt  << "  dF_rose = " << dF_rose << "  dF_newton = " << dF_newt << std::endl;
 	}
+
+	if (dF_rose < dF_newt){
+	  t = t_rose;
+	  if(lverbose){std::cout << " newton step rejected     F0=" << -log(F0)/beta <<  "  F1=" << F1 << "  F2=" << F2 << "  Sw2= " <<  Sw2 <<  " tError=" <<sqrt(Sw2) / S0<< std::endl;}
+	  // means F2 > F0, i.e. Sdtwprime < 0 
+	}else{
+	  if(lverbose){ std::cout << " newton step accepted     F0=" << -log(F0)/beta <<  "  F1=" << F1 << "  F2=" << F2 << "  Sw2= " <<  Sw2 <<  " tError=" <<sqrt(Sw2) / S0<< std::endl;}
+	  t = t_newt;
+	  nit_newt ++;
+	}
+
 	
-	if(verbose){
-	  cout << " YY " << nit << " T= " << 1/beta << "  t=" << t <<  "    t-t0=" <<  t-t0 << "  F0=" << -log(F0)/beta<< endl;
+	if(lverbose){
+	  cout << " YY " << nit << " T= " << 1/beta << "  t=" << t <<  " +/- " << sqrt(Sw2)/S0 <<  "    t-t0=" <<  t-t0 << "  F0=" << -log(F0)/beta<< endl;
 	  // dump the full monty
 	  for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
 	    {
@@ -4539,69 +4561,72 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton(const reco::Ve
 		  auto trk = tracks.from_ref(*tk);
 		  if (trk.has_timing() && (trk.timeQuality() >= minquality))
 		  {
-		    double dt = trk.MTD_timeerror();
-		    double e[3] = {0,0,0};
-		    double Z = exp(-beta * 0.5* 3.* 3.);
+		    double sigmat_trk = trk.MTD_timeerror();
+		    double ae[3] = {0,0,0};
+		    double Z = Z0;
 		    for(unsigned int j = 0; j < 3; j++){
-		      double tpull =  (trk.th[j] - t0) / dt;
-		      e[j] = exp(- 0.5 * beta * tpull * tpull);
-		      Z += a[j] * e[j];
+		      double tpull =  (trk.th[j] - t0) / sigmat_trk;
+		      ae[j] = a_hyp[j] * exp(- 0.5 * beta * tpull * tpull);
+		      Z += ae[j];
 		    }
-		    cout << "    " << fixed << setw(7) << setprecision(7) << trk.t() 
-			 << "+/-" << fixed << setw(6) << setprecision(7) << dt;
+		    cout << "    " << fixed << setw(7) << setprecision(4) << trk.t() 
+			 << "+/-" << fixed << setw(6) << setprecision(4) << sigmat_trk;
 		    for(unsigned int j = 0; j < 3; j++){
-		      double wt = a[j] * e[j] / Z;
+		      double wt = ae[j] / Z;
 		      cout << "  [" <<  fixed << setw(1) << j << "]  " 
-			   << fixed << setw(7) << setprecision(7) << trk.th[j] << "ns  " 
-			   << fixed << setw(7) << setprecision(5) << wt;  
+			   << fixed << setw(7) << setprecision(4) << trk.th[j] << "ns  " 
+			   << fixed << setw(7) << setprecision(4) << wt;  
 		    }
 		    if(trk.matched()) {
-		      cout << "   m " << fixed << setw(8) << setprecision(7) << trk.get_t_pid()
-			   << " gen " << fixed << setw(8) << setprecision(7) << trk.tsim();
+		      cout << "   m " << fixed << setw(8) << setprecision(4) << trk.get_t_pid()
+			   << " gen " << fixed << setw(8) << setprecision(4) << trk.tsim();
 		    }
 		    cout << endl;
 		  }
 	      }
 	    }// end of track dump loop
-	}
+	} // verbose
+
 	if ((fabs(t - t0) < 1e-4 / sqrt(beta)) && (beta >= 1.))
 	  {
-	    tError = sqrt(w2sum) / wsum;
-	    if(verbose) {
+	    double tError = sqrt(Sw2) / S0;
+	    if(lverbose) {
 	      cout << "vertex_time_from_tracks_pid_newton  minquality=" << minquality 
 		   << " tfit = " << t << " +/- " << tError
 		   << " trec = " << v.t()
 		   << " iteration " <<  nit  << "   newton " << nit_newt;
+	      cout << " Tfinal = " << 1./beta;
 	      cout << endl;
 	    }
-	    return true;
+	    result.success(t, tError, nit);
+	    return result;
 	  }
 	
 	if ((fabs(t - t0) < 1e-3) && ((beta < 1.)))
 	  { 
+	    beta0 = beta;
 	    beta = std::min(1., beta / cooling_factor);
+	    Z0 = exp(-beta * 0.5 * cut_off * cut_off);
 	  }
 
 	t0 = t;
 
       }
+    result.status = 3;
+    result.niteration = nit;
     //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton failed to converge", 10);
   }else{
+    result.status = 2;
     //report_counted("PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_pid_newton has no track timing info", 10);
   }
-  t = 0;
-  tError = 1.e10;
-  return false;
+  return result;
 }
 
 
 
-bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_analysis(bool time_method(const reco::Vertex&,
-										 Tracks& ,
-										 double ,
-										 double& ,
-										 double&, 
-										 bool ), 
+
+PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_analysis(
+								PrimaryVertexAnalyzer4PU::Vertex_time_result  time_method(const reco::Vertex&, Tracks& , double , bool ), 
 								const MVertex & v,
 								Tracks& tracks,
 								double minquality,
@@ -4613,30 +4638,30 @@ bool PrimaryVertexAnalyzer4PU::vertex_time_from_tracks_analysis(bool time_method
   string suffix = (label=="") ? label : "_"+label;
   
   string timer_label = "vertex_time_fromtracks" + suffix;
-  timer_start(timer_label);
-  double t, tError;
-  bool success = time_method(*(v.recvtx), tracks, minquality, t, tError, verbose);
-  timer_stop(timer_label);
+  if (!verbose) timer_start(timer_label);
+  auto result = time_method(*(v.recvtx), tracks, minquality, verbose);
+  if (!verbose) timer_stop(timer_label);
 
 
-  if (success)
-    {
-      // timing from tracks
-      Fill(h, vtype + "/trecsim_fromtracks" + suffix, t - simevt.t, simevt.is_signal());
-      Fill(h, vtype + "/trecerr_fromtracks" + suffix, tError, simevt.is_signal());
-      Fill(h, vtype + "/trecsimpull_fromtracks" +suffix, (t - simevt.t) / tError, simevt.is_signal());
+  if (!verbose){
+    if (result.successful())
+      {
+	// timing from tracks
+	Fill(h, vtype + "/trecsim_fromtracks" + suffix, result.t() - simevt.t, simevt.is_signal());
+	Fill(h, vtype + "/trecerr_fromtracks" + suffix, result.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecsimpull_fromtracks" +suffix, (result.t() - simevt.t) / result.tError(), simevt.is_signal());
       
-      // also fill histos with the default values for the same list of vertices for comparison
-      Fill(h, vtype + "/trecsim_withtracks" + suffix, v.t() - simevt.t, simevt.is_signal());
-      Fill(h, vtype + "/trecerr_withtracks" + suffix, v.tError(), simevt.is_signal());
-      Fill(h, vtype + "/trecsimpull_withtracks" + suffix, (v.t() - simevt.t) / v.tError(), simevt.is_signal());
-    }
-  else
-    {
-      report_counted("fillVertexHistosMatched: "+label+ " timing from tracks failed",1);
-    }
-  
-  return success;
+	// also fill histos with the default values for the same list of vertices for comparison
+	Fill(h, vtype + "/trecsim_withtracks" + suffix, v.t() - simevt.t, simevt.is_signal());
+	Fill(h, vtype + "/trecerr_withtracks" + suffix, v.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecsimpull_withtracks" + suffix, (v.t() - simevt.t) / v.tError(), simevt.is_signal());
+      }
+    else
+      {
+	report_counted("fillVertexHistosMatched: "+label+ " timing from tracks failed",1);
+      }
+  }
+  return result;
 }
 
 
@@ -5107,8 +5132,14 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       vertex_time_from_tracks_analysis(vertex_time_from_tracks, v, tracks, 0., simevt, "", h, vtype);
       vertex_time_from_tracks_analysis(vertex_time_from_tracks, v, tracks, 0.8, simevt, "qual", h, vtype);
       vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0. , simevt, "pid", h, vtype);
-      vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0.8, simevt, "qual_pid", h, vtype);
-      vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype);
+      auto qresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0.8, simevt, "qual_pid", h, vtype);
+      auto nresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype);
+      if (qresult.successful() && !nresult.successful()){
+	cout << "qual successful, newton failed "<< endl;
+	cout << "qual : t=" << qresult.t() << " +/- " << qresult.tError() << "   nit =  " << qresult.niteration << endl;
+	nresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype, true);
+      }
+      
 
       double tsim = simevt.t;
       Fill(h, vtype + "/trecsim", v.t() - tsim, simevt.is_signal());
@@ -6938,23 +6969,6 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   }
 
 
-
-
-  /*
-  if (verbose_){
-    std::cout << std::endl << std::endl;
-    std::cout << "***********************************************************" << std::endl;
-    std::cout << " entering vertex collection analysis " << std::endl;
-    std::cout << " MC = " << MC_ << std::endl;
-    if(tracking_truth_available_){
-      std::cout << " tracking truth available" << std::endl;
-    }else{
-      std::cout << " no tracking truth " << std::endl;
-    }
-    std::cout << "***********************************************************" << std::endl;
-    std::cout << std::endl << std::endl;
-  }
-  */
 
 
   // analyze the vertex collections

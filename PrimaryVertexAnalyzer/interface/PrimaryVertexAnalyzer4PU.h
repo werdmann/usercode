@@ -1281,15 +1281,39 @@ private:
   double vertex_maxfrac(const reco::Vertex&);
   double vertex_sumpt2(const reco::Vertex&);
   double vertex_sumpt(const reco::Vertex&);
-  static bool vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
-  static bool vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
-  static bool vertex_time_from_tracks_pid_newton(const reco::Vertex&, Tracks& tracks, double minquality, double& t, double& tError, bool verbose=false);
 
-  bool vertex_time_from_tracks_analysis(bool time_method(const reco::Vertex&,
+  class Vertex_time_result {
+  public:
+    unsigned int status; 
+    double tvtx, tvtxError;
+    unsigned int niteration;
+    Vertex_time_result(){
+      status = 1;
+      tvtx = 0;
+      tvtxError = 0;
+      niteration = 0;
+    }
+    void success(const double t, const double tError, const unsigned int iterations){ 
+      tvtx = t;
+      tvtxError = tError;
+      niteration = iterations;
+      status = 0;
+    }
+    const double t(){ return tvtx;};
+    const double tError(){ return tvtxError;};
+    const bool successful(){ return status==0;}
+    const bool no_status(){ return status==1;}
+    const bool no_tracks_with_timing(){ return status==2;}
+    const bool not_converged(){ return status==3;}
+  };
+    
+  static Vertex_time_result vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, bool verbose=false);
+  static Vertex_time_result vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, bool verbose=false);
+  static Vertex_time_result vertex_time_from_tracks_pid_newton(const reco::Vertex&, Tracks& tracks, double minquality, bool verbose=false);
+
+  PrimaryVertexAnalyzer4PU::Vertex_time_result vertex_time_from_tracks_analysis(PrimaryVertexAnalyzer4PU::Vertex_time_result time_method(const reco::Vertex&,
                                                        Tracks& ,
 						       double ,
-                                                       double& ,
-						       double&, 
 						        bool),
 					const MVertex & v,
 					Tracks& tracks,
