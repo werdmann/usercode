@@ -654,7 +654,7 @@ public:
     float trackWeight (MTrack const * tk)const { return weights.at(tk->key());};
     float trackWeight (MTrack const & tk)const { return weights.at(tk.key());};
 
-    bool has_timing(){return (t() != 0);};// FIXME improve
+    bool has_timing() const {return (t() != 0) && (tError()>0.) && (tError()<9.) ;};// FIXME improve
 
 
     const reco::Vertex * recvtx;   // pointer to the underlying reco::Vertex
@@ -1162,6 +1162,12 @@ public:
 
     // for tracks from a collection : access by the key of the original track
     MTrack& from_key(const unsigned int key){
+      auto index = index_from_key(key);
+      assert(recotracks[index].key() == key);
+      return recotracks[index];
+    }
+
+    unsigned int index_from_key(const unsigned int key){
       // make the map if needed
       if (key2idx.size() != recotracks.size()) {
 	key2idx.clear();
@@ -1170,10 +1176,11 @@ public:
         }
       }
       assert(recotracks[key2idx[key]].key() == key);
-      return recotracks[key2idx[key]];
+      return key2idx[key];
     }
 
     MTrack& from_ref(const edm::RefToBase<reco::Track> ref) { return from_key(ref.key()); }
+    unsigned int  index_from_ref(const edm::RefToBase<reco::Track> ref) { return index_from_key(ref.key()); }
 
     unsigned int simevent_index_from_key(const unsigned int key) {
       MTrack& tk = from_key(key);
@@ -1287,17 +1294,22 @@ private:
     unsigned int status; 
     double tvtx, tvtxError;
     unsigned int niteration;
+    std::vector<float> tk_tweight;
+    double Tc;
     Vertex_time_result(){
       status = 1;
       tvtx = 0;
       tvtxError = 0;
       niteration = 0;
+      tk_tweight.clear();
+      Tc = 0;
     }
-    void success(const double t, const double tError, const unsigned int iterations){ 
+    void success(const double t, const double tError, const unsigned int iterations, const double Tclast=0.){ 
       tvtx = t;
       tvtxError = tError;
       niteration = iterations;
       status = 0;
+      Tc = Tclast;
     }
     const double t(){ return tvtx;};
     const double tError(){ return tvtxError;};
@@ -1324,11 +1336,20 @@ private:
 					const std::string vtype,
 					bool verbose=false);
 
+
+  void multi_vertex_time_from_tracks_pid(const std::string label, Tracks& tracks, double minquality, bool verbose=false);
+  void mass_constrained_multi_vertex_time_from_tracks_pid(const std::string label, Tracks& tracks, double minquality, bool verbose=false);
+
+
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
 
   void addn(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram in a subdirectory and use the subdirectory name in the map key
+    auto key = gDirectory->GetName() + std::string("/") + hist->GetName();
+    if (h.find(key) != h.end()){
+      std::cout << "addn: Warning ! adding already existing histogram " << key << std::endl;
+    }
     h[gDirectory->GetName() + std::string("/") + hist->GetName()] = hist;
     hist->StatOverflows(kTRUE);
     hist->SetDirectory(gDirectory);
@@ -1336,6 +1357,9 @@ private:
 
   void add(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram
+    if (h.find(hist->GetName()) != h.end()){
+      std::cout << "warning ! adding already existing histogram " << hist->GetName() << std::endl;
+    }
     h[hist->GetName()] = hist;
     hist->StatOverflows(kTRUE);
     hist->SetDirectory(gDirectory);
@@ -1343,6 +1367,9 @@ private:
   
   void add(std::map<std::string, TH1*>& h, TH1* hist, const std::string& vtype) {
     // add a histogram
+    if (h.find(hist->GetName()) != h.end()){
+      std::cout << "warning ! adding already existing histogram " << hist->GetName() << std::endl;
+    }
     std::string hname(hist->GetName());
     std::string htitle(hist->GetTitle());
     TH1* histn = (TH1*)hist->Clone((hname + "_" + vtype).c_str());
@@ -1356,6 +1383,9 @@ private:
   void addSP(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram + two versions (Signal and PU)
     std::string name = hist->GetName();
+    if (h.find(name + "Signal") != h.end()){
+      std::cout << "addSP: warning ! adding already existing histogram " << name << std::endl;
+    }
     std::string title = hist->GetTitle();
     //std::cout << "addSP  " << name << " gDirectory = " <<  gDirectory->GetName() << std::endl;
     h[hist->GetName()] = hist;
@@ -1521,6 +1551,9 @@ private:
   bool get_beamspot_data(const edm::Event&);
   bool get_reco_and_transient_tracks(const edm::EventSetup&, const edm::Event&, Tracks&);
   bool get_miniaod_tracks(const edm::EventSetup&, const edm::Event&, const std::string &, Tracks&);
+  void add_timing_to_vertex_collection(const std::string & label, Tracks& tracks);
+  void refit_recvertices_after_timing(Tracks&);
+  void fill_track_to_vertex_pointers(Tracks&);
 
   double muvtx(double z);
 
@@ -1639,7 +1672,8 @@ private:
 
   void analyzeVertexMergeRateTP(std::map<std::string, TH1*>& h,
                                 MVertexCollection& recVtxs,
-                                std::vector<SimEvent>& simEvt,
+				Tracks & tracks, 
+				std::vector<SimEvent>& simEvt,
                                 const std::string message = "");
 
 
@@ -1854,6 +1888,7 @@ private:
   static constexpr bool dump_big_fakes_ = false;
   
   bool f4D_;
+  bool frefit_;
   bool fTrackTime_;
 
   bool RECO_;

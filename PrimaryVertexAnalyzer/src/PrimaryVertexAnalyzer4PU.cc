@@ -204,6 +204,7 @@ PrimaryVertexAnalyzer4PU::PrimaryVertexAnalyzer4PU(const ParameterSet& iConfig)
   ndof0trk_ = 0.;
 
   f4D_ = (iConfig.getUntrackedParameter<bool>("f4D", true));
+  frefit_ = (iConfig.getUntrackedParameter<bool>("frefit", false));
   if (f4D_) {
     std::cout << "PrimaryVertexAnalyzer4PU  TrackTimeResosLabel "
               << iConfig.getUntrackedParameter<edm::InputTag>("TrackTimeResosLabel") << std::endl;
@@ -573,12 +574,6 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
                0.,
                2.));
   add(h,
-      new TH1F("zdiffrecselsignalfake",
-               "z-distance between reconstructed signal and fake ndof>4 vertices",
-               nbinzdiffrec,
-               0.,
-               2.));
-  add(h,
       new TH1F("zdiffrecselsignalsplit",
                "z-distance between reconstructed signal and split-off selected vertices",
                nbinzdiffrec,
@@ -631,6 +626,8 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
           "zdiffrecselPUfake", "z-distance between reconstructed PU and fake ndof>4 vertices", nbinzdiffrec, 0., 2.));
 
   add(h, new TH1F("zdiffrecselsignalfake", "z-distance between reconstructed Signal and fake selected vertices", nbinzdiffrec, 0., 2.));
+  add(h, new TH1F("zdiffrecselsignalfakev2", "z-distance between reconstructed Signal and fake selected vertices", nbinzdiffrec, 0., 2.)); // eventually get rid of this
+  add(h, new TH1F("zdiffsimselsignalrealpu", "simulated z-distance between reconstructed Signal and real selected vertices", nbinzdiffrec, 0., 2.));
   add(h, new TH1F("zdiffrecselsignalrealpu", "z-distance between reconstructed Signal and real selected vertices", nbinzdiffrec, 0., 2.));
   add(h, new TH1F("zdiffrecselsignalrealpuidx1", "z-distance between reconstructed Signal and real selected vertices at index 1", nbinzdiffrec, 0., 2.));
   add(h, new TH1F("zdiffrecselsignalsplitfromsignal", "z-distance between reconstructed Signal and fake selected vertices", nbinzdiffrec, 0., 2.));
@@ -666,9 +663,12 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   add(h, new TH2F("wornk_matchedsim","n70% vs sumwos", 100, -1., 7., 5, 0., 5.));
   add(h, new TH2F("wornk_unmatchedsim","n70% vs sumwos", 100, -1., 7., 5, 0., 5.));
 
-  addSP(h, new TH1F("vtxtrkpurity", "track purity in vertex", 100, 0., 1.));
+  addSP(h, new TH1F("vtxtrkpurity", "track purity in vertex", 101, 0., 1.01));
+  addSP(h, new TH1F("vtxtrktimingpurity", "timing track purity in vertex", 101, 0., 1.01));
   addSP(h, new TProfile("vtxtrkpurityvspu", "track purity in vertex vs PU", npubin2, 0., npumax, 0., 2.));
-  addSP(h, new TProfile("vtxtrkpurityvsz", "vertex purity", nzbin_wide_fine, -zrange_wide, zrange_wide, 0., 1.));
+  addSP(h, new TProfile("vtxtrkpurityvsz", "vertex purity", nzbin_wide_fine, -zrange_wide, zrange_wide, 0., 2.));
+  addSP(h, new TProfile("vtxtrktimingpurityvspu", "timing track purity in vertex vs PU", npubin2, 0., npumax, 0., 2.));
+  addSP(h, new TProfile("vtxtrktimingpurityvsz", "timing track purity in vertex", nzbin_wide_fine, -zrange_wide, zrange_wide, 0., 2.));
   // now the purity with only matched tracks in the denominator
   addSP(h, new TH1F("vtxtrkpuritym", "track purity in vertex", 100, 0., 1.));
   addSP(h, new TProfile("vtxtrkpuritymvspu", "track purity in vertex vs PU (matched only)", npubin2, 0., npumax, 0., 2.));
@@ -919,8 +919,6 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   add(h, new TH1F("nevtLPU", "event counter for zrec4vsLPU", 10, 0., 100.));
   add(h, new TH2F("zrecselvsLPU", "z-zbeam selected vertices", 10, 0., 100., 100, -20., 20.));
   add(h, new TH1F("zdiffrecselfold", "expected z-distance from z for ndof>4", nbinzdiffrec, -20., 20.));
-  add(h, new TH1F("zdiffrecsel", "z-distance between ndof>4 vertices", nbinzdiffrec, -20., 20.));
-  add(h, new TH1F("zdiffrecselhr", "z-distance between ndof>4 vertices", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("zdiffrecselhr_zgt1", "z-distance between ndof>4 vertices", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("zdiffrecselhr_tail", "z-distance between ndof>4 vertices", nbinzdiffrec, -2., 2.));
   add(h, new TH1F("zdiffrecselhr_tailzgt1", "z-distance between ndof>4 vertices", nbinzdiffrec, -2., 2.));
@@ -983,12 +981,8 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   add(h, new TH1F("zdiffsimfound", "z distance of found simulated vertices", 4000, -10., 10));
   add(h, new TH1F("zdiffsimall", "z distance of simulated vertices", 4000, -10., 10));
   add(h, new TH1F("zdiffsimfoundTP", "delta-zsim of found simulated distance with at least 4 tracks", 4000, -10., 10));
-  add(h,
-      new TH1F(
-          "zdiffsimfound4TP", "delta-zsim of found simulated distance with at least 4 tracks, ndof>4", 4000, -10., 10));
-  add(h,
-      new TH1F(
-          "zdiffsimfound4SignalTP", "delta-zsim of found simulated distance Signal-PU, ntrk>3,ndof>4", 4000, -10., 10));
+  add(h, new TH1F("zdiffsimfound4TP", "delta-zsim of found simulated distance with at least 4 tracks, ndof>4", 4000, -10., 10));
+  add(h, new TH1F("zdiffsimfound4SignalTP", "delta-zsim of found simulated distance Signal-PU, ntrk>3,ndof>4", 4000, -10., 10));
   add(h, new TH1F("zdiffsimfoundTP2", "z distance of found simulated distance (2)", 4000, -10., 10));
   add(h, new TH1F("zdiffsimallTP", "z distance of simulated distance", 4000, -10., 10));
   add(h, new TH2F("zdiffrecvssim", "z distance rec vertices vs simulated distance", 100, -1., 1., 100, -1., 1.));
@@ -1892,6 +1886,7 @@ PrimaryVertexAnalyzer4PU::~PrimaryVertexAnalyzer4PU() {
   //  note that track histograms are automatically also created and filled for all vtypes !
   vector<string> ttypes = {"trkall",
                            "trksel",
+                           "trkseltiming",
                            "sellost",
                            "selused",
                            "trkselhipt",
@@ -3071,6 +3066,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
     tracks.push_back(tk);
   }
 
+  /* moved to a separate method 
   // set-up the reco  track --> vertex pointers
 
   for (auto label : vertexCollectionLabels_) {
@@ -3095,6 +3091,7 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
       iv++;
     }
   }
+  */
   
   if (recTrks->size() < minNumberOfRecTrks_) {
     emptyeventcounter_++;
@@ -3113,6 +3110,168 @@ bool PrimaryVertexAnalyzer4PU::get_reco_and_transient_tracks(const edm::EventSet
 }
 /********************************************************************************************************/
 
+
+   
+/********************************************************************************************************/
+void  PrimaryVertexAnalyzer4PU::fill_track_to_vertex_pointers(Tracks& tracks) {
+/********************************************************************************************************/
+  for (auto label : vertexCollectionLabels_) {
+
+    if (recVtxs_[label] == NULL) continue;
+    
+    unsigned int iv = 0;
+    for (auto recv : *recVtxs_[label]) {
+      if (recv.tracksSize() > 0){
+	for (trackit_t t = recv.tracks_begin(); t != recv.tracks_end(); t++) {
+          auto & tk = tracks.from_key(t->key());
+          const auto weight = recv.trackWeight(*t);
+          assert(tk.key() == t->key());
+          if( tk.get_recv(label) == NO_RECVTX ||  tk.get_weight(label) < weight){
+            tk._recv[label] = iv;
+            tk._weight[label] =  weight;
+            assert(tracks.from_key(t->key()).get_weight(label) == weight);
+            assert(tracks.from_key(t->key()).get_recv(label) == iv);
+          }
+	}
+      }
+      iv++;
+    }
+  }
+}
+/********************************************************************************************************/
+
+
+
+  
+/********************************************************************************************************/
+void PrimaryVertexAnalyzer4PU::add_timing_to_vertex_collection(const string & label, Tracks& tracks) {
+/********************************************************************************************************
+ * does the pid timing fit for each vertex one-by-one, 3d part is not touched
+*********************************************************************************************************/
+
+    if (recVtxs_[label] == NULL){
+      return;
+    }
+    
+    auto new_collection = new reco::VertexCollection;
+    
+    for (auto recv : *recVtxs_[label]) {
+      
+      auto result = vertex_time_from_tracks_pid(recv, tracks, 0.8, false);
+      
+      if (result.successful()){
+	auto err = recv.covariance4D();
+	err(3, 3) = result.tError() * result.tError();
+	reco::Vertex new_recv = Vertex(recv.position(),  err, result.t(), recv.chi2(), recv.ndof(), recv.tracksSize());
+	// copy the tracks and weights
+	for(auto tk : recv.tracks()){   // recv.tracks() ->  std::vector<TrackBaseRef>;
+	  new_recv.add(tk, recv.trackWeight(tk));
+	}
+	new_collection->push_back(new_recv);
+      }else{
+	new_collection->push_back(recv);
+      }
+    } // vertices
+    
+    delete recVtxs_[label];
+    recVtxs_[label] = new_collection;
+    
+}
+/********************************************************************************************************/
+  
+
+
+
+
+/********************************************************************************************************/
+void PrimaryVertexAnalyzer4PU::refit_recvertices_after_timing(Tracks& tracks) {
+/********************************************************************************************************
+ * does the pid timing fit for each vertex one-by-one
+ * removes tracks that are rejected by the timing fit
+ * first observation:
+ *   small improvement of the purity but also significant reduction of assignment efficiency
+ *   in cases where a "small" vertex is swamped by tracks from a "big" neighbour this doesn't help
+ *    -> need a multi-vertex approach here
+*********************************************************************************************************/
+
+  for( auto label : vertexCollectionLabels_){
+
+    if (recVtxs_[label] == NULL){
+      continue;
+    }
+    
+    auto new_collection = new reco::VertexCollection;
+    
+    for (auto recv : *recVtxs_[label]) {
+      
+      auto result = vertex_time_from_tracks_pid(recv, tracks, 0.8, false);
+      
+      // select the tracks
+      vector<TransientTrack> vtxtracks;
+      unsigned int tkidx = 0;
+      for(auto tv = recv.tracks_begin(); tv != recv.tracks_end(); tv++){
+	const reco::TrackRef trackRef = tv->castTo<reco::TrackRef>();
+	
+	TransientTrack  transientTrack = theB_->build(trackRef); 
+	transientTrack.setBeamSpot(vertexBeamSpot_);
+	if(result.successful()){
+	  // use only accepted tracks
+	  if ( result.tk_tweight[tkidx] > 0.5) {
+	    vtxtracks.push_back(transientTrack);
+	  }
+	} else {
+	  // take all (may reject the vertex later)
+	  vtxtracks.push_back(transientTrack);
+	}
+	tkidx++;
+      }
+      
+      // refit
+      AdaptiveVertexFitter  theFitter(GeometricAnnealing(2.5)); //;algorithm.fitter = new AdaptiveVertexFitter(GeometricAnnealing(algoconf->getParameter<double>("chi2cutoff")));
+      TransientVertex v = theFitter.vertex(vtxtracks);
+
+      if (v.isValid()){
+
+	if (result.successful()){
+	  // make it a 4d vertex
+	  auto err = v.positionError().matrix4D();
+	  err(3, 3) = result.tError() * result.tError();
+	  auto trkWeightMap3d = v.weightMap();  // copy the 3d-fit weights
+	  v = TransientVertex(v.position(), result.t(), err, v.originalTracks(), v.totalChiSquared(), v.degreesOfFreedom());
+	  v.weightMap(trkWeightMap3d);
+	}
+
+	reco::Vertex new_recv = v;
+	std::cout << " refitted   (" <<  result.status << ")" 
+		  <<  "     z : " << fixed << setw(8) << setprecision(4) << recv.z() << " -> " << fixed << setw(8) << setprecision(4)  << new_recv.z() 
+		  <<  "     tracks : " << fixed << setw(4) << recv.tracksSize() << " -> " <<  fixed << setw(4) << new_recv.tracksSize()
+		  <<  "     ndof : "  << fixed << setw(6) << setprecision(2) << recv.ndof()  << " -> "  << fixed << setw(6) << setprecision(2) << new_recv.ndof();
+	if (result.not_converged()) {
+	  cout << "   rejected " << endl;
+	}else{
+	  cout << "   accepted " << endl;
+	  new_collection->push_back(new_recv);
+	}
+      }else{
+	// refit failed, discard or copy old version
+	std::cout << " refit failed (" << result.status << ")"
+		  <<  "    z : " << fixed << setw(8) << setprecision(4) << recv.z() 
+		  <<  "    tracks : "  << fixed << setw(4) << recv.tracksSize() << " -> "  << fixed << setw(4) << vtxtracks.size() 
+		  <<  "    ndof : "  << fixed << setw(6) << setprecision(2) << recv.ndof() 
+		  << "   rejected " << std::endl;
+	//new_collection->push_back(recv);
+      } // valid fit ?
+      
+    } // vertices
+    
+    std::cout << "about to replace collection " << label << "  " << recVtxs_[label]->size() << " ->" << new_collection->size() << std::endl;
+    delete recVtxs_[label];
+    recVtxs_[label] = new_collection;
+    std::cout << "done " << std::endl;
+    
+  }// collections
+}
+/********************************************************************************************************/
 
 
 
@@ -4174,7 +4333,7 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
   double tsum = 0;
   double wsum = 0;
   double w2sum = 0;
-  double t;
+  double t = 0;
   for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
     if (v.trackWeight(*tk) > 0.5) {
       auto trk = tracks.from_ref(*tk);
@@ -4237,10 +4396,13 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 							   double minquality,
 							   bool verbose) {
   PrimaryVertexAnalyzer4PU::Vertex_time_result result;
+  result.tk_tweight.assign(v.tracksSize(), 1.);
   double tsum = 0;
   double wsum = 0;
+  double w0sum = 0;
   double w2sum = 0;
   double t;
+
 
   if(verbose) {
     cout << "vertex_time_from_tracks_pid vtx x=" << v.x()
@@ -4250,7 +4412,6 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
          << endl;
   }
 
-  //double a[3] = {0.333333333,0.33333333,0.333333333};
   double a[3] = {0.7,0.2,0.1};
   constexpr double cooling_factor = 0.5;
   // initial guess
@@ -4295,6 +4456,9 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 	tsum = 0;
 	wsum = 0;
 	w2sum = 0;
+	w0sum = 0;
+	double wtcsum = 0;
+	unsigned int tkidx = 0;
 	for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
 	  {
 	    if (v.trackWeight(*tk) > 0.5)
@@ -4311,17 +4475,30 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 		      Z += a[j] * e[j];
 		    }
 
-		    double wsum_trk = 0;
+		    double wtsum_trk = 0;
+		    double wsum_trk = 0; // aka s00
+		    double s11 = 0, s21 = 0;
 		    for(unsigned int j = 0; j < 3; j++){
 		      double wt = a[j] * e[j] / Z;
-		      double w = wt * v.trackWeight(*tk) / (dt * dt);
+		      wtsum_trk += wt;
+		      double w = wt / (dt * dt);
+		      // for the vertex time
+		      wsum += w * v.trackWeight(*tk);
+		      tsum += w * v.trackWeight(*tk) * trk.th[j]; 
+		      // for error propagation
 		      wsum_trk += w;
-		      tsum += w * trk.th[j]; 
+		      s11 +=  (trk.th[j] - t0)  * w;
+		      s21 +=  pow(trk.th[j] - t0, 2)  * w;
 		    }
-		    wsum += wsum_trk;
-		    w2sum += wsum_trk * wsum_trk * (dt * dt) / v.trackWeight(*tk); 
-		  }
-	      }
+		    result.tk_tweight[tkidx] = wtsum_trk * v.trackWeight(*tk);
+		    //w2sum += wsum_trk * wsum_trk * (dt * dt) / v.trackWeight(*tk);  // old
+		      double dfodt = (wsum_trk + beta * (s11*s11 - s21/(dt*dt)) )* v.trackWeight(*tk);
+		    w2sum += pow(dfodt * dt, 2);
+		    w0sum += dfodt;
+		    wtcsum += s21/(dt*dt);
+		  }// track has timing
+	      } // track weight > 0.5
+	    tkidx ++;
 	  }
 	if (wsum < 1e-10)
 	  {
@@ -4331,8 +4508,9 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 
 	t = tsum / wsum;
 	if(verbose){
-	  cout << " XX " << nit << " T= " << 1/beta << "  t=" << t <<  "    t-t0=" <<  t-t0 << endl;
+	  cout << " XX " << nit << " T= " << 1/beta << "  t=" << t <<  "    t-t0=" <<  t-t0 << "  Tc=" << wtcsum/wsum << endl;
 	  // dump the full monty
+	  unsigned int tkidx = 0;
 	  for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++)
 	    {
 	      if (v.trackWeight(*tk) > 0.5)
@@ -4356,6 +4534,7 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 			   << fixed << setw(7) << setprecision(7) << trk.th[j] << "ns  " 
 			   << fixed << setw(7) << setprecision(5) << wt;  
 		    }
+		    cout << "  wtot = " << fixed << setw(7) << setprecision(5) << result.tk_tweight[tkidx];  
 		    if(trk.matched()) {
 		      cout << "   m " << fixed << setw(8) << setprecision(7) << trk.get_t_pid()
 			   << " gen " << fixed << setw(8) << setprecision(7) << trk.tsim();
@@ -4363,19 +4542,21 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 		    cout << endl;
 		  }
 	      }
+	      tkidx ++;
 	    }// end of track dump loop
 	}
 	if ((fabs(t - t0) < 1e-4 / sqrt(beta)) && (beta >= 1.))
 	  {
-	    double tError = sqrt(w2sum) / wsum;
+	    double tError = sqrt(w2sum) / w0sum;
 	    if(verbose) {
 	      cout << "vertex_time_from_tracks_pid         minquality=" << minquality 
 		   << " tfit = " << t << " +/- " << tError
 		   << " trec = " << v.t()
-		   << " iteration " <<  nit;
+		   << " iteration " <<  nit
+		   << " Tc = " <<  wtcsum/wsum ;
 	      cout << endl;
 	    }
-	    result.success(t, tError, nit);
+	    result.success(t, tError, nit,  wtcsum/wsum );
 	    return result;
 	  }
 	
@@ -4652,9 +4833,11 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
 	Fill(h, vtype + "/trecsimpull_fromtracks" +suffix, (result.t() - simevt.t) / result.tError(), simevt.is_signal());
       
 	// also fill histos with the default values for the same list of vertices for comparison
-	Fill(h, vtype + "/trecsim_withtracks" + suffix, v.t() - simevt.t, simevt.is_signal());
-	Fill(h, vtype + "/trecerr_withtracks" + suffix, v.tError(), simevt.is_signal());
-	Fill(h, vtype + "/trecsimpull_withtracks" + suffix, (v.t() - simevt.t) / v.tError(), simevt.is_signal());
+	if(v.has_timing()){
+	  Fill(h, vtype + "/trecsim_withtracks" + suffix, v.t() - simevt.t, simevt.is_signal());
+	  Fill(h, vtype + "/trecerr_withtracks" + suffix, v.tError(), simevt.is_signal());
+	  Fill(h, vtype + "/trecsimpull_withtracks" + suffix, (v.t() - simevt.t) / v.tError(), simevt.is_signal());
+	}
       }
     else
       {
@@ -4663,6 +4846,732 @@ PrimaryVertexAnalyzer4PU::Vertex_time_result PrimaryVertexAnalyzer4PU::vertex_ti
   }
   return result;
 }
+
+
+
+int multi_vertex_dump_counter_ = -1;
+void PrimaryVertexAnalyzer4PU::mass_constrained_multi_vertex_time_from_tracks_pid(const std::string label,
+							   Tracks& tracks,
+							   double minquality,
+							   bool verbose) {
+  multi_vertex_dump_counter_++;
+  // work on this collection
+  auto & input_vertices = recVtxs_[label];
+
+
+  // cluster properties and clusters cluster-sums
+  unsigned int nvtx = input_vertices->size();
+  std::vector<double> tsum(nvtx);
+  std::vector<double> psum(nvtx);
+  std::vector<double> wsum(nvtx);
+  std::vector<double> w2sum(nvtx);
+  std::vector<double> w0sum(nvtx);
+  std::vector<double> vtx_rhot(nvtx);
+  std::vector<double> vtx_t(nvtx);
+  std::vector<double> vtx_tError(nvtx);
+  std::vector<double> vtx_z(nvtx);     // input only
+
+  
+
+  // build a track table for the relevant tracks with timing
+  std::vector<unsigned int> timing_tracklist;
+  std::vector<unsigned int> timing_track_vtx_input;
+  for(unsigned int k =0 ; k< nvtx; k++){
+    auto & v = input_vertices->at(k);
+    vtx_z[k] = v.z();
+    for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
+      if(v.trackWeight(*tk) < 0.5) continue; // just a test
+      unsigned int itrk = tracks.index_from_ref(*tk);
+      if (tracks[itrk].has_timing() && (tracks[itrk].timeQuality() >= minquality)){
+	if (find(timing_tracklist.begin(), timing_tracklist.end(), itrk) ==  timing_tracklist.end()){
+	  timing_tracklist.push_back(itrk);
+	  timing_track_vtx_input.push_back(k);
+	  vtx_rhot[k] += 1.;
+	}else{
+	  // should not happen currently
+	  cout << "track assigned to multiple vertices ?" << endl;
+	}
+      }
+    }
+  }
+
+  // FIXME use previously unassigned tracks ?
+
+  // prepare arrays, pre-fill track z and z-error
+  unsigned int ntrk = timing_tracklist.size();
+  std::vector<double> Z(ntrk);
+  std::vector<double> track_z_error(ntrk);
+  std::vector<double> track_z(ntrk);
+  std::vector<double> track_vtx_assignment_prob(ntrk);
+  std::vector<unsigned int> track_vtx_assignment(ntrk);
+
+  for(unsigned int i = 0; i < ntrk; i++){
+    auto trk = tracks[timing_tracklist[i]];
+    auto k = timing_track_vtx_input[i];
+    track_z[i] = trk.z();
+    track_z_error[i] = sqrt(pow(trk.dzError(), 2) + pow(0.0020 / tan(trk.theta()),2) + pow(0.0020,2));
+    if(multi_vertex_dump_counter_ < 1){
+      cout << fixed << setw(4) << setprecision(0) << i <<  ")"
+	   << " k= " << fixed << setw(3) << setprecision(0) << k
+	   << " zvtx = "  << fixed << setw(8) << setprecision(4) << vtx_z[k]
+	   << " ztrk = "  << fixed << setw(8) << setprecision(4) << track_z[i] 
+	   << " +/-"  << fixed << setw(7) << setprecision(4) << track_z_error[i] 
+	   << " zpull = " << fixed << setw(5) << setprecision(2) << (track_z[i]-vtx_z[k])/track_z_error[i]
+	   << "     ttrk[pi/K/p] = "   << fixed << setw(7) << setprecision(3) << trk.th[0] << " " << setw(7) << setprecision(3)<< trk.th[1] << " " << setw(7) << setprecision(3) << trk.th[2]
+	   << "  +/-"  << fixed << setw(7) << setprecision(3) << trk.MTD_timeerror();
+      if(trk.matched()){
+	cout << "  zsim = " <<  fixed << setw(8) << setprecision(4) << trk.zsim()
+	     << "  tsim = " <<  fixed << setw(7) << setprecision(3) << trk.tsim()
+	     << "  m=" << trk.get_particle_mass();
+      }
+      cout << endl;
+    }
+  }
+
+
+  // constants
+  double a[3] = {0.7,0.2,0.1};
+  constexpr double cooling_factor = 0.5;
+  const double Ezmax = 50;                        // ignore everything above
+  const double Etmax = 50;                        // ignore everything above
+  constexpr double Ezcutoff = 0.5 * 3 * 3;        // const. term in partition function, z-only
+  constexpr double Eztcutoff = 0.5 * (3*3 + 3*3); // zt
+
+  // initial guess for cluster timing at high T
+
+  // reset sums
+  for(unsigned int k =0 ; k< nvtx; k++){
+    psum[k] = 0;
+    tsum[k] = 0;
+    wsum[k] = 0;
+    vtx_rhot[k] = vtx_rhot[k] / ntrk;
+  }
+
+
+  for(unsigned int i = 0; i < ntrk; i++){
+    auto  trk = tracks[timing_tracklist[i]];
+    double tErr = trk.MTD_timeerror();
+    double tErrSq = tErr * tErr;
+    double tbar = 0;
+    for(unsigned int j=0; j < 3; j++){ tbar += a[j] * trk.th[j];  }
+
+    // track assignment probability denominator (partition function)
+    // at beta -> 0 this is z-only!
+    double Ztrk = exp(-Ezcutoff); // cut-off 
+    for(unsigned int k = 0; k < nvtx; k++){
+      double Ez = 0.5 * pow((track_z[i] - vtx_z[k]) / track_z_error[i], 2); 
+      if( Ez < Ezmax) { Ztrk += exp(-Ez) * vtx_rhot[k]; } 
+    }
+
+    // use Ztrk for the the assignment probabilities now
+    if(Ztrk > exp(-Ezmax)){ // always true if Ezmax > Ezcutoff
+      for(unsigned int k = 0; k < nvtx; k++){
+	double Ez = 0.5 * pow((track_z[i] - vtx_z[k]) / track_z_error[i], 2); 
+	if( Ez < Ezmax){
+	  double p = vtx_rhot[k] * exp(-Ez) / Ztrk; 
+	  double w = p / tErrSq; 
+	  psum[k] += p;
+	  wsum[k] += w;
+	  tsum[k] += w * tbar;
+	}
+      }
+    }
+  } // track loop
+
+  // evaluate cluster time estimates
+  for(unsigned int k=0; k< nvtx; k++){
+    vtx_rhot[k] =  psum[k] / ntrk;
+
+    if(wsum[k] > 0){
+      vtx_t[k] = tsum[k] / wsum[k];
+    }else{
+      vtx_t[k] = 0;
+    }
+      
+    if(multi_vertex_dump_counter_ < 1){
+      if(wsum[k] > 0 ){
+	std::cout << "initial guess for vertex " << fixed << setw(4) << k << " at "  
+		  << "  z=" << fixed << setprecision(4) << setw(8) << vtx_z[k] 
+		  << "  t=" << fixed << setprecision(3) << setw(8) << vtx_t[k]
+		  << "  rhot=" << fixed << setprecision(6) << setw(8) << vtx_rhot[k]
+		  << "  t[org]=" << fixed << setprecision(3) << setw(7) << input_vertices->at(k).t()
+		  << endl;
+      }else{
+	std::cout << "mass_constrained_multi_vertex_time_from_tracks_pid : no initial guess for vertex " 
+		  << k << " at "  << vtx_z[k]   <<  "  rho_t="  << setprecision(6) << vtx_rhot[k] 
+		  << "  t[org]=" << fixed << setprecision(3) << setw(7) << input_vertices->at(k).t()
+		  << endl;
+      }
+    }
+
+  }
+
+
+  // annealing loop
+
+  int nit = 0;
+  double beta = 1. / 256.;
+  double tres_sq = 0;
+  while ( (nit++) < 200)  // sometimes converge veeery slowly
+    {
+
+      double Z0 = exp(-Eztcutoff);
+
+      // first pass, partition function, Z[i]
+      for(unsigned int i = 0; i < ntrk; i++){
+	auto  trk = tracks[timing_tracklist[i]];
+	double tErr = trk.MTD_timeerror();
+
+	// probability denominator
+	Z[i] =  Z0;
+	for(unsigned int k = 0; k < nvtx; k++){
+	  double Ez = 0.5 * pow((vtx_z[k] - track_z[i]) / track_z_error[i], 2); 
+	  if( Ez > Ezmax) continue;
+	  for(unsigned int j = 0; j < 3; j++){
+	    double thpull =  (trk.th[j] - vtx_t[k]) / tErr;
+	    double Eth = 0.5 * thpull * thpull;
+	    if (fabs(beta * Eth) < Etmax){
+	      Z[i] += a[j] * exp(- beta * Eth - Ez) * vtx_rhot[k];
+	    }
+	  }
+	}
+      }// 1st track loop
+
+
+      // reset cluster sums
+      for(unsigned int k =0 ; k< nvtx; k++){
+	tsum[k] = 0;
+	wsum[k] = 0;
+	psum[k] = 0;
+	w2sum[k] = 0;
+	w0sum[k] = 0;
+      }
+
+      // second track loop, assignment and cluster sums
+      for(unsigned int i=0; i< ntrk; i++){
+	track_vtx_assignment_prob[i] = 0.;
+	track_vtx_assignment[i] = 0;
+
+	auto  trk = tracks[timing_tracklist[i]];
+	double tErr = trk.MTD_timeerror();
+	double tErrSq = tErr * tErr;
+
+	for(unsigned int k = 0; k < nvtx; k++){
+	  double Ez = 0.5 * pow((vtx_z[k] - track_z[i]) / track_z_error[i], 2); 
+	  if( Ez > Ezmax) continue;
+
+	  double tk_vtx_prob = 0; 
+	  double wsum_trk = 0;
+	  double s11=0, s21=0;
+	  for(unsigned int j = 0; j < 3; j++){
+	    double thpull =  (trk.th[j] - vtx_t[k]) / tErr;
+	    double Eth = 0.5 * thpull * thpull;
+	    if(fabs(beta * Eth) < Etmax){
+	      double probh = a[j] * exp(- beta * Eth - Ez) / Z[i] * vtx_rhot[k];
+	      psum[k] += probh;
+	      tk_vtx_prob = max(tk_vtx_prob,  probh);
+	      double w = probh / tErrSq;
+	      // for the vertex time
+	      tsum[k] += w * trk.th[j];
+	      wsum[k] += w;
+	      // error propagation
+	      wsum_trk += w;
+	      s11 +=  (trk.th[j] - vtx_t[k])  * w;// new
+	      s21 +=  pow(trk.th[j] - vtx_t[k], 2)  * w;
+	    }
+	  }
+	  //w2sum[k] += wsum_trk * wsum_trk * (dt * dt);  // naive error propagation 
+	  double dfodt = wsum_trk + beta * (s11*s11 - s21/tErrSq);
+	  w2sum[k] += pow(dfodt * tErr, 2);
+	  w0sum[k] += dfodt;
+
+	  if(tk_vtx_prob > track_vtx_assignment_prob[i]){
+	    track_vtx_assignment_prob[i] = tk_vtx_prob;
+	    track_vtx_assignment[i] = k;
+	  }
+	}// cluster k
+      }//track i
+
+
+      // update cluster times
+      tres_sq = 0;
+      double sum_rhot = 0.;
+      for(unsigned int k = 0; k < nvtx; k++){
+	vtx_rhot[k] = psum[k] / ntrk;
+	if (wsum[k] < 1e-10) {
+	  // essentially no timing for this cluster
+	  //cout << "no timing " << k << "  wsum="  << scientific << wsum[k] << "  rho=" << scientific << vtx_rhot[k] << " t[org]=" << input_vertices->at(k).t() << endl;
+	  vtx_t[k] = input_vertices->at(k).t();
+	  vtx_tError[k] = 9.999;
+	}else{
+	  double t_new = tsum[k] / wsum[k];
+	  tres_sq += pow(t_new - vtx_t[k], 2);
+	  vtx_t[k] = t_new;
+	  vtx_tError[k] = sqrt(w2sum[k]) / w0sum[k];
+	  sum_rhot += vtx_rhot[k];
+	}
+      }
+      //cout << "DEBUG sum_rhot=" << sum_rhot << endl;
+      
+      // at final temperature and converged?
+      if ((tres_sq < 1e-8 / beta) && (beta >= 1.)){
+	if(multi_vertex_dump_counter_ < 20){
+	  cout << "multi converged" 
+	       << " iteration " <<  nit
+	       << " sum_rho = " << scientific << sum_rhot << fixed
+	       << " tres = " << scientific << tres_sq << fixed
+	       << endl;
+	}
+	
+
+	if(multi_vertex_dump_counter_ < 1){
+	  for(unsigned int k = 0; k < nvtx; k++){
+	    cout << fixed << setw(3) << k << " ) " 
+		 << "  z = " << fixed << setw(8) << setprecision(4) << vtx_z[k]
+		 << "  t = " << fixed << setw(7) << setprecision(3) << vtx_t[k]
+		 << "  +/- " << fixed << setw(7) << setprecision(3) << vtx_tError[k]
+		 << "  rhot" << fixed << setw(8) << setprecision(5) << vtx_rhot[k]
+		 << "       t[org]=" << fixed << setw(7) << setprecision(3) << input_vertices->at(k).t() 
+		 << "  +/- " << fixed << setw(7) << setprecision(3) << input_vertices->at(k).tError()
+	       << endl;
+	  }
+	}
+
+	if(multi_vertex_dump_counter_ < 1){
+	  for(unsigned int i = 0; i< ntrk; i++){
+	    if( (track_vtx_assignment[i] != timing_track_vtx_input[i])
+	      && (track_vtx_assignment_prob[i] > 0.01)) {
+	      auto trk = tracks[timing_tracklist[i]];
+	      cout << " track "  << setw(4) << i 
+		   << "  z= "   << fixed << setw(8) << setprecision(4) << track_z[i] 
+		   << "  +/-"  << fixed << setw(7) << setprecision(4) << track_z_error[i] 
+		   << "  t = "   << fixed << setw(7) << setprecision(3) << trk.th[0] << " " << setw(7) << setprecision(3)<< trk.th[1] << " " << setw(7) << setprecision(3) << trk.th[2]
+		   << "  +/-"  << fixed << setw(7) << setprecision(3) << trk.MTD_timeerror()
+		   << "   changed owner " 
+		   <<  "  from " << setw(4) << timing_track_vtx_input[i] << ", z,t="  
+		   << fixed << setw(8) << setprecision(4) << vtx_z[timing_track_vtx_input[i]] 
+		   <<  fixed << setw(7) << setprecision(3) << vtx_t[timing_track_vtx_input[i]] 
+		   <<  "  to " << setw(4) << track_vtx_assignment[i]  <<", z,t="  
+		 << fixed << setw(8) << setprecision(4) << vtx_z[track_vtx_assignment[i]]
+		   <<  fixed << setw(7) << setprecision(3) << vtx_t[track_vtx_assignment[i]] 
+		   << "   p= "  << track_vtx_assignment_prob[i];
+	      if(trk.matched()){
+		cout << "  zsim= " << fixed << setw(8) << setprecision(4) << trk.zsim() 
+		     << "  tsim= " <<  fixed << setw(7) << setprecision(3) << trk.tsim();
+	      }
+	      if(trk.matched() && !(trk.is_primary())){
+		cout << "  secondary";
+	      }
+	      cout << endl;
+
+	    }
+	  }
+	}
+
+	// refit (z)
+	AdaptiveVertexFitter  theFitter(GeometricAnnealing(2.5)); 
+	auto new_collection = new reco::VertexCollection;
+
+	for(unsigned int k = 0; k < nvtx; k++){
+	  // select the tracks =  timing tracks + non-timing tracks
+	  vector<TransientTrack> vtxtracks;
+
+	  // non-timing, use existing assignment
+	  auto & v_input = input_vertices->at(k);
+	  for(auto tk = v_input.tracks_begin(); tk != v_input.tracks_end(); tk++){
+	    const reco::TrackRef trackRef = tk->castTo<reco::TrackRef>();
+	    unsigned int itrk = tracks.index_from_ref(*tk);
+	    if (find(timing_tracklist.begin(), timing_tracklist.end(), itrk) == timing_tracklist.end()){
+	      vtxtracks.push_back(tracks[itrk].transientTrack());
+	    }
+	  }
+
+	  // timing tracks, possibly re-assigned
+	  for(unsigned int i = 0; i< ntrk; i++){
+	    if ((track_vtx_assignment[i] == k) && (track_vtx_assignment_prob[i] > 0.4)){
+	      vtxtracks.push_back(tracks[timing_tracklist[i]].transientTrack());
+	    }
+	  }
+
+
+	  // redo the 3d-fit with the revised tracklist
+	  TransientVertex v = theFitter.vertex(vtxtracks);
+	  if (v.isValid()){
+	    // make it a 4d vertex, use the time from the multi-vertex fit
+	    auto err = v.positionError().matrix4D();
+	    err(3, 3) = pow(vtx_tError[k], 2);
+	    auto trkWeightMap3d = v.weightMap();  // copy the 3d-fit weights
+	    v = TransientVertex(v.position(), vtx_t[k], err, 
+				v.originalTracks(), v.totalChiSquared(), v.degreesOfFreedom());
+	    v.weightMap(trkWeightMap3d);
+	    reco::Vertex new_recv = v;
+	    new_collection->push_back(new_recv);
+	  }else{
+	    // drop this vertex
+	    cout << "mass_constrained_multi_vertex_time_from_tracks_pid : refit failed for vertex " <<  k << endl;
+	  }
+      	}
+
+	delete recVtxs_[label];
+	recVtxs_[label] = new_collection;
+	return;
+      }
+      
+      // converged at intermediate temperature, cool down
+      if ( (tres_sq < 1e6) && ((beta < 1.))){
+	beta = std::min(1., beta / cooling_factor);
+      }
+
+    }// while
+ 
+  cout << "mass_constrained_multi_vertex_time_from_tracks_pid did not converge,   nit=" << nit << "  tres=" << scientific << tres_sq << endl;
+}
+
+
+
+
+
+/* this is the version without cluster masses, probably obsolete !!! */
+void PrimaryVertexAnalyzer4PU::multi_vertex_time_from_tracks_pid(const std::string label,
+							   Tracks& tracks,
+							   double minquality,
+							   bool verbose) {
+
+  multi_vertex_dump_counter_++;
+  // work on this collection
+  auto & input_vertices = recVtxs_[label];
+
+
+  // cluster properties and clusters cluster-sums
+  unsigned int nvtx = input_vertices->size();
+  std::vector<double> tsum(nvtx);
+  std::vector<double> wsum(nvtx);
+  std::vector<double> w2sum(nvtx);
+  std::vector<double> vtx_t(nvtx);
+  std::vector<double> vtx_tError(nvtx);
+  std::vector<double> vtx_z(nvtx);     // input only
+
+
+
+  // build a track table for the relevant tracks with timing
+  std::vector<unsigned int> timing_tracklist;
+  std::vector<unsigned int> timing_track_vtx_input;
+  for(unsigned int k =0 ; k< nvtx; k++){
+    auto & v = input_vertices->at(k);
+    vtx_z[k] = v.z();
+    for (auto tk = v.tracks_begin(); tk != v.tracks_end(); tk++) {
+      unsigned int itrk = tracks.index_from_ref(*tk);
+      if (tracks[itrk].has_timing() && (tracks[itrk].timeQuality() >= minquality)){
+	if (find(timing_tracklist.begin(), timing_tracklist.end(), itrk) ==  timing_tracklist.end()){
+	  timing_tracklist.push_back(itrk);
+	  timing_track_vtx_input.push_back(k);
+	}else{
+	  // should not happen currently
+	  cout << "track assigned to multiple vertices ?" << endl;
+	}
+      }
+    }
+  }
+
+
+  // prepare arrays, pre-fill track z and z-error
+  unsigned int ntrk = timing_tracklist.size();
+  //stable_sort(timing_tracklist.begin(), timing_tracklist(end)); don't really care
+  std::vector<double> Z(ntrk);
+  std::vector<double> track_z_error(ntrk);
+  std::vector<double> track_z(ntrk);
+  std::vector<double> track_vtx_assignment_prob(ntrk);
+  std::vector<unsigned int> track_vtx_assignment(ntrk);
+
+  for(unsigned int i = 0; i < ntrk; i++){
+    auto trk = tracks[timing_tracklist[i]];
+    auto k = timing_track_vtx_input[i];
+    track_z[i] = trk.z();
+    track_z_error[i] = sqrt(pow(trk.dzError(), 2) + pow(0.0020 / tan(trk.theta()),2) + pow(0.0020,2));
+    if(multi_vertex_dump_counter_ < 1){
+      cout << fixed << setw(4) << setprecision(0) << i <<  ")"
+	   << " k= " << fixed << setw(3) << setprecision(0) << k
+	   << "  zvtx = "  << fixed << setw(8) << setprecision(4) << vtx_z[k]
+	   << "  ztrk = "   << fixed << setw(8) << setprecision(4) << track_z[i] 
+	   << " +/-"  << fixed << setw(7) << setprecision(4) << track_z_error[i] 
+	   << "  zpull = " << fixed << setw(5) << setprecision(2) << (track_z[i]-vtx_z[k])/track_z_error[i]
+	   << "     ttrk[pi/K/p] = "   << fixed << setw(7) << setprecision(3) << trk.th[0] << " " << setw(7) << setprecision(3)<< trk.th[1] << " " << setw(7) << setprecision(3) << trk.th[2]
+	   << "  +/-"  << fixed << setw(7) << setprecision(3) << trk.MTD_timeerror();
+      if(trk.matched()){
+	cout << "  zsim = " <<  fixed << setw(8) << setprecision(4) << trk.zsim()
+	     << "  tsim = " <<  fixed << setw(7) << setprecision(3) << trk.tsim()
+	     << "  m=" << trk.get_particle_mass();
+      }
+      cout << endl;
+    }
+  }
+
+
+  // constants
+  double a[3] = {0.7,0.2,0.1};
+  constexpr double cooling_factor = 0.5;
+
+
+  // initial guess for cluster timing at high T
+
+  // reset sums
+  for(unsigned int k =0 ; k< nvtx; k++){
+    tsum[k] = 0;
+    wsum[k] = 0;
+  }
+
+
+  for(unsigned int i = 0; i < ntrk; i++){
+    auto  trk = tracks[timing_tracklist[i]];
+    double dt = trk.MTD_timeerror();
+    double tbar = 0;
+    for(unsigned int j=0; j < 3; j++){ tbar += a[j] * trk.th[j];  }
+
+    // track assignment probability denominator (partition function)
+    // at beta -> 0 this is z-only!
+    double Ztrk = exp(-0.5*100.); // cut-off 
+    for(unsigned int k = 0; k < nvtx; k++){
+      double Ez = 0.5 * pow((track_z[i] - vtx_z[k]) / track_z_error[i], 2); 
+      if( Ez < 50.) { Ztrk += exp(-Ez); } 
+    }
+
+    // use Ztrk for the the assignment probabilities now
+    if(Ztrk > exp(-0.5*100.)){
+      for(unsigned int k =0; k < nvtx; k++){
+	double Ez = 0.5 * pow((track_z[i] - vtx_z[k]) / track_z_error[i], 2); 
+	if( Ez < 50.){
+	  double w = exp(-Ez) / Ztrk / (dt*dt); 
+	  wsum[k] += w;
+	  tsum[k] += w * tbar;
+	}
+      }
+    }
+  } // track loop
+
+  // evaluate cluster time estimates
+  for(unsigned int k=0; k< nvtx; k++){
+    if(wsum[k] > 0){
+      vtx_t[k] = tsum[k] / wsum[k];
+      if(multi_vertex_dump_counter_ < 1){
+      std::cout << "initial guess for vertex " << fixed << setw(4) << k << " at "  
+		<< "  z=" << fixed << setprecision(4) << setw(8) << vtx_z[k] 
+		<< "  t=" << fixed << setprecision(3) << setw(8) << vtx_t[k]
+		<< endl;
+      }
+    }else{
+      std::cout << "multi_vertex_time_from_tracks_pid : no initial guess for vertex " << k << " at "  << vtx_z[k] << endl;
+      vtx_t[k] = 0.;
+    }
+  }
+
+
+  // annealing loop
+
+  int nit = 0;
+  double beta = 1. / 256.;
+  while ( (nit++) < 100)
+    {
+
+      double Z0 = exp(-0.5 * 5. * 5. - 0.5 * beta * 3. * 3. );
+
+      // first round, determine the partition function
+      for(unsigned int i = 0; i < ntrk; i++){
+	auto  trk = tracks[timing_tracklist[i]];
+	double dt = trk.MTD_timeerror();
+
+	// probability denominator
+	Z[i] =  Z0;
+	for(unsigned int k = 0; k < nvtx; k++){
+	  double Ez = 0.5 * pow((vtx_z[k] - track_z[i]) / track_z_error[i], 2); 
+	  if( Ez > 50.) continue;
+	  for(unsigned int j = 0; j < 3; j++){
+	    double thpull =  (trk.th[j] - vtx_t[k]) / dt;
+	    double Eth = 0.5 * thpull * thpull;
+	    if (fabs(beta * Eth) < 100){
+	      Z[i] += a[j] * exp(- beta * Eth - Ez);
+	    }
+	  }
+	}
+      }// 1st track loop
+
+      // reset cluster sums for vertex updates in the 2nd track loop
+      for(unsigned int k =0 ; k< nvtx; k++){
+	tsum[k] = 0;
+	wsum[k] = 0;
+	w2sum[k] = 0;
+      }
+
+      // second track loop, assignment and cluster sums
+      for(unsigned int i=0; i< ntrk; i++){
+	track_vtx_assignment_prob[i] = 0.;
+	track_vtx_assignment[i] = 0;
+
+	auto  trk = tracks[timing_tracklist[i]];
+	double dt = trk.MTD_timeerror();
+
+	for(unsigned int k = 0; k < nvtx; k++){
+	  double Ez = 0.5 * pow((vtx_z[k] - track_z[i]) / track_z_error[i], 2); 
+	  if( Ez > 50.) continue;
+
+	  double tk_vtx_prob = 0; 
+	  double wsum_trk = 0;
+	  for(unsigned int j = 0; j < 3; j++){
+	    double thpull =  (trk.th[j] - vtx_t[k]) / dt;
+	    double Eth = 0.5 * thpull * thpull;
+	    if(fabs(beta * Eth) < 100){
+	      double probh = a[j] * exp(- beta * Eth - Ez) / Z[i];
+	      tk_vtx_prob = max(tk_vtx_prob,  probh);
+	      double w = probh / (dt * dt);
+	      wsum_trk += w;
+	      tsum[k] += w * trk.th[j]; 
+	      if( (beta>0.99) && (i==32) && ((k==0) || (k==128))){
+		cout << " i=" << i << " k=" << k << "  j=" << j << "  prob="  << probh  << "   zpull=" << (vtx_z[k] - track_z[i]) / track_z_error[i] << "  tpull = " << thpull << " nit=" << nit  << endl;
+	      }
+	    }
+	  }
+	  wsum[k] += wsum_trk;
+	  w2sum[k] += wsum_trk * wsum_trk * (dt * dt); 
+
+	  if(tk_vtx_prob > track_vtx_assignment_prob[i]){
+	    track_vtx_assignment_prob[i] = tk_vtx_prob;
+	    track_vtx_assignment[i] = k;
+	  }
+	  if( (beta>0.99) && (i==32) && ((k==0) || (k==128))){
+	    cout << " i=" << i << " k=" << k << "  tk_vtx_prob "  << tk_vtx_prob << endl;
+	  }
+	}// cluster k
+	if( (beta>0.99) && (i==32)){
+	  cout << " i=" << i << " track_vtx_assignment=" <<  track_vtx_assignment[i] << "  tk_vtx_assignment_prob = "  <<  track_vtx_assignment_prob[i]<< endl;
+	}
+      }//track i
+
+
+      // update cluster times
+      double tres = 0;
+      for(unsigned int k = 0; k < nvtx; k++){
+	if (wsum[k] < 1e-10) {
+	  // essentially no timing for this cluster
+	  vtx_tError[k] = 9.999;
+	}else{
+	  double t_new = tsum[k] / wsum[k];
+	  tres += pow(t_new - vtx_t[k], 2);
+	  vtx_t[k] = t_new;
+	  vtx_tError[k] = sqrt(w2sum[k]) / wsum[k];
+	}
+      }
+      
+      // at final temperature and converged?
+      if ((tres < 1e-8 / beta) && (beta >= 1.)){
+	if(multi_vertex_dump_counter_ < 20){
+	cout << "multi converged" 
+	     << " iteration " <<  nit
+	     << " tres = " << scientific << tres << fixed
+	     << endl;
+	}
+
+	if(multi_vertex_dump_counter_ < 1){
+	for(unsigned int k = 0; k < nvtx; k++){
+	  cout << fixed << setw(3) << k << " ) " 
+	       << "  z = " << fixed << setw(8) << setprecision(4) << vtx_z[k]
+	       << "  t = " << fixed << setw(7) << setprecision(3) << vtx_t[k]
+	       << "  +/- " << fixed << setw(7) << setprecision(3) << vtx_tError[k]
+	       << endl;
+	}
+	}
+
+	if(multi_vertex_dump_counter_ < 1){
+	for(unsigned int i = 0; i< ntrk; i++){
+	  if(track_vtx_assignment[i] != timing_track_vtx_input[i]){
+	    auto trk = tracks[timing_tracklist[i]];
+	    cout << " track "  << setw(4) << i 
+		 << "  z= "   << fixed << setw(8) << setprecision(4) << track_z[i] 
+		 << "  +/-"  << fixed << setw(7) << setprecision(4) << track_z_error[i] 
+		 << "  t = "   << fixed << setw(7) << setprecision(3) << trk.th[0] << " " << setw(7) << setprecision(3)<< trk.th[1] << " " << setw(7) << setprecision(3) << trk.th[2]
+		 << "  +/-"  << fixed << setw(7) << setprecision(3) << trk.MTD_timeerror()
+		 << "   changed owner " 
+		 <<  "  from " << setw(4) << timing_track_vtx_input[i] << ", z,t="  
+		 << fixed << setw(8) << setprecision(4) << vtx_z[timing_track_vtx_input[i]] 
+		 <<  fixed << setw(7) << setprecision(3) << vtx_t[timing_track_vtx_input[i]] 
+		 <<  "  to " << setw(4) << track_vtx_assignment[i]  <<", z,t="  
+		 << fixed << setw(8) << setprecision(4) << vtx_z[track_vtx_assignment[i]]
+		 <<  fixed << setw(7) << setprecision(3) << vtx_t[track_vtx_assignment[i]] 
+		 << "   p= "  << track_vtx_assignment_prob[i];
+	    if(trk.matched()){
+	      cout << "  zsim= " << fixed << setw(8) << setprecision(4) << trk.zsim() 
+		   << "  tsim= " <<  fixed << setw(7) << setprecision(3) << trk.tsim();
+	    }
+	    if(trk.matched() && !(trk.is_primary())){
+	      cout << "  secondary";
+	    }
+	    cout << endl;
+
+	  }
+	}
+	}
+
+	// refit
+	AdaptiveVertexFitter  theFitter(GeometricAnnealing(2.5)); 
+	auto new_collection = new reco::VertexCollection;
+
+	for(unsigned int k = 0; k < nvtx; k++){
+	  // select the tracks =  timing tracks + non-timing tracks
+	  vector<TransientTrack> vtxtracks;
+
+	  // non-timing, use existing assignment
+	  auto & v_input = input_vertices->at(k);
+	  for(auto tk = v_input.tracks_begin(); tk != v_input.tracks_end(); tk++){
+	    const reco::TrackRef trackRef = tk->castTo<reco::TrackRef>();
+	    unsigned int itrk = tracks.index_from_ref(*tk);
+	    if (find(timing_tracklist.begin(), timing_tracklist.end(), itrk) == timing_tracklist.end()){
+	      vtxtracks.push_back(tracks[itrk].transientTrack());
+	    }
+	  }
+
+	  // timing tracks, possibly re-assigned
+	  for(unsigned int i = 0; i< ntrk; i++){
+	    if ((track_vtx_assignment[i] == k) && (track_vtx_assignment_prob[i] > 0.1)){
+	      // track assigned by multi-vertex fit
+	      vtxtracks.push_back(tracks[timing_tracklist[i]].transientTrack());
+	    //}else if ((timing_track_vtx_input[i] == k) && (track_vtx_assignment_prob[i] == 0)){
+	      // track was not re-assigned(?)
+	      //  vtxtracks.push_back(tracks[timing_tracklist[i]].transientTrack());
+	    }
+	  }
+
+	  // FIXME : remove the vertex time when no timing track is part of the fit
+	  // fit
+	  TransientVertex v = theFitter.vertex(vtxtracks);
+	  if (v.isValid()){
+	    // make it a 4d vertex, use the time from the multi-vertex fit
+	    auto err = v.positionError().matrix4D();
+	    err(3, 3) = pow(vtx_tError[k], 2);
+	    auto trkWeightMap3d = v.weightMap();  // copy the 3d-fit weights
+	    v = TransientVertex(v.position(), vtx_t[k], err, 
+				v.originalTracks(), v.totalChiSquared(), v.degreesOfFreedom());
+	    v.weightMap(trkWeightMap3d);
+	    reco::Vertex new_recv = v;
+	    new_collection->push_back(new_recv);
+	  }else{
+	    // drop this vertex
+	    cout << "refit failed for vertex " <<  k << endl;
+	  }
+      	}
+
+	delete recVtxs_[label];
+	recVtxs_[label] = new_collection;
+	return;
+      }
+      
+      // converged at intermediate temperature, cool down
+      if ( (tres < 1e6) && ((beta < 1.))){
+	beta = std::min(1., beta / cooling_factor);
+      }
+
+    }// while
+ 
+  cout << "multi_vertex_time_from_tracks_pid did not converge,   nit= " << nit << endl;
+}
+
 
 
 double PrimaryVertexAnalyzer4PU::vertex_ptmax2(const reco::Vertex& v) {
@@ -4682,6 +5591,7 @@ double PrimaryVertexAnalyzer4PU::vertex_ptmax2(const reco::Vertex& v) {
   }
   return ptmax2;
 }
+
 
 
 double PrimaryVertexAnalyzer4PU::vertex_sumpt2(const reco::Vertex& v) {
@@ -5133,24 +6043,28 @@ void PrimaryVertexAnalyzer4PU::fillVertexHistosMatched(std::map<std::string, TH1
       vertex_time_from_tracks_analysis(vertex_time_from_tracks, v, tracks, 0.8, simevt, "qual", h, vtype);
       vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0. , simevt, "pid", h, vtype);
       auto qresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid, v, tracks, 0.8, simevt, "qual_pid", h, vtype);
+      /*
       auto nresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype);
       if (qresult.successful() && !nresult.successful()){
 	cout << "qual successful, newton failed "<< endl;
 	cout << "qual : t=" << qresult.t() << " +/- " << qresult.tError() << "   nit =  " << qresult.niteration << endl;
 	nresult = vertex_time_from_tracks_analysis(vertex_time_from_tracks_pid_newton, v, tracks, 0.8, simevt, "qual_pid_new", h, vtype, true);
       }
+      */
       
 
       double tsim = simevt.t;
-      Fill(h, vtype + "/trecsim", v.t() - tsim, simevt.is_signal());
-      Fill(h, vtype + "/trecerr", v.tError(), simevt.is_signal());
-      Fill(h, vtype + "/trecsimpull", (v.t() - tsim) / v.tError(), simevt.is_signal());
-      Fill(h, vtype + "/trecsimpullwide", (v.t() - tsim) / v.tError(), simevt.is_signal());
-      Fill(h, vtype + "/trecerrvsntrkprof", float(ntiming), v.tError(), simevt.is_signal());
-      Fill(h, vtype + "/trecerrvsntrk", float(ntiming), v.tError(), simevt.is_signal());
-      if( v.tError() < 0.1){
-	Fill(h, vtype + "/trecsim_sigmatlt01", v.t() - tsim, simevt.is_signal());
-	Fill(h, vtype + "/trecsimpull_sigmatlt01", (v.t() - tsim) / v.tError(), simevt.is_signal());
+      if(v.has_timing()){
+	Fill(h, vtype + "/trecsim", v.t() - tsim, simevt.is_signal());
+	Fill(h, vtype + "/trecerr", v.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecsimpull", (v.t() - tsim) / v.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecsimpullwide", (v.t() - tsim) / v.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecerrvsntrkprof", float(ntiming), v.tError(), simevt.is_signal());
+	Fill(h, vtype + "/trecerrvsntrk", float(ntiming), v.tError(), simevt.is_signal());
+	if( v.tError() < 0.1){
+	  Fill(h, vtype + "/trecsim_sigmatlt01", v.t() - tsim, simevt.is_signal());
+	  Fill(h, vtype + "/trecsimpull_sigmatlt01", (v.t() - tsim) / v.tError(), simevt.is_signal());
+	}
       }
     }// 4D
 }
@@ -5167,7 +6081,7 @@ void PrimaryVertexAnalyzer4PU::fillTrackHistos(std::map<std::string, TH1*>& h, c
       Fill(h, ttype + "/t0trk", tk.t());
       Fill(h, ttype + "/t0errtrk", tk.dt());
       Fill(h, ttype + "/t0qualtrk", tk.timeQuality());
-      if (! (v==NULL) && (v->isValid()) && (v->ndof() > 10.) ){
+      if (! (v==NULL) && (v->isValid()) && (v->ndof() > 10.)  && (v->tError()>0.)  && (v->tError()<9.) ){
 	double deltat = tk.t() - v->t();
 	Fill(h, ttype + "/trestrk", deltat);
 	Fill(h, ttype + "/tpulltrk", deltat / sqrt(pow(tk.dt(),2) + pow(v->tError(), 2)));
@@ -6880,6 +7794,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
     report_counted("no PU info found", 1);
   }   
 
+
   // select pu window if requested
   assert(puInfo.getPU_zpositions().size() == simPU_);
 
@@ -6891,6 +7806,7 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   }
 
 
+   // get the beamspot into global "vertexBeamSpot_"
   if (!get_beamspot_data(iEvent)) {
     return;
   }
@@ -6969,6 +7885,14 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
   }
 
 
+  add_timing_to_vertex_collection(vertexCollectionLabels_[0], tracks);  // no refit
+  if (frefit_) {
+    //refit_recvertices_after_timing(tracks);
+    mass_constrained_multi_vertex_time_from_tracks_pid(vertexCollectionLabels_[0], tracks, 0.8, true);
+  }
+
+  fill_track_to_vertex_pointers(tracks);  // must do this here in case refitting rejects vertices
+
 
 
   // analyze the vertex collections
@@ -7015,11 +7939,9 @@ void PrimaryVertexAnalyzer4PU::analyze(const Event& iEvent, const EventSetup& iS
 	wos_match(vertexes, simEvt, tracks);  // make a one-to-one assignment
 	timer_stop("tp-matching");
 
-	/* FIXME todo
-	   timer_start("analyzeMergeRateTP");
-	   analyzeVertexMergeRateTP(histos, vertexes, simEvt, recvmatch_[label], label);
-	   timer_stop("analyzeMergeRateTP");
-	*/
+	timer_start("analyzeMergeRateTP");
+	analyzeVertexMergeRateTP(histos, vertexes, tracks, simEvt, label); //recvmatch_[label]
+	timer_stop("analyzeMergeRateTP");
 
         timer_start("analyzeVertexCollectionTP");
 	analyzeVertexCollectionTP(histos, vertexes, tracks, simEvt, label);
@@ -7163,8 +8085,6 @@ void PrimaryVertexAnalyzer4PU::dumpEventSummary(std::vector<SimEvent> & simEvt, 
 /***************************************************************************************/
 {
 // print summary info
-  if ((dumpThisEvent_ && (dumpcounter_ < ndump_)) || (verbose_ && (eventcounter_ < ndump_)) ||
-      (autoDumpCounter_-- > 0) || (forceDump_)) {
     cout << endl
          << "Event dump " << dumpcounter_ << endl
          << "event counter=" << eventcounter_ << " Run=" << run_ << "  LumiBlock " << luminosityBlock_ << "  event  "
@@ -7215,7 +8135,6 @@ void PrimaryVertexAnalyzer4PU::dumpEventSummary(std::vector<SimEvent> & simEvt, 
       if (verbose_)
       cout << endl << endl;
     }
-  } // dump
 
 
 }//dumpEventSummary
@@ -8395,7 +9314,7 @@ void PrimaryVertexAnalyzer4PU::signalvtxmatch(MVertexCollection & vertexes, std:
           if (f4D_ && tk->has_timing() && (tk->dt() > 0)) {
             wos = wos / erf(tk->dt() / sigmaT_);
           }
-          double wnt = v.trackWeight(tk) * min(tk->pt(), 1.0);  // (truncated-)pt-weighted track count
+          double wnt = v.trackWeight(tk) * min(tk->pt(), 1.0);  // (truncated-)pt-weighted track count (downweights pt < 1 GeV tracks)
           v.add_truthmatched_track(iev, wos, wnt);   // fill track(wos)  rec vtx <- sim vtx, increments sumnt and sumwos
           ev.addTrack(iv, wos, wnt);                 // fill track(wos)  sim vtx -> rec vtx
           evwos += wos;
@@ -8726,6 +9645,8 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
   double sum_pt(0), sum_pt_majority(0), sum_pt_minority(0), sum_pt_unmatched(0);
   double sum_nt(0), sum_nt_majority(0), sum_nt_minority(0), sum_nt_unmatched(0);
   double sum_wt(0), sum_wt_majority(0), sum_wt_minority(0), sum_wt_unmatched(0);
+  double sum_nt_timing(0), sum_nt_timing_majority(0), sum_nt_timing_minority(0), sum_nt_timing_unmatched(0);
+  const double min_timing_quality = 0.8;
 
   // count tracks in the rec vertex
   for (auto tv : v.tracks){
@@ -8733,6 +9654,8 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
     if (wt<0.5) continue;
     double wpt = min(10., tv->pt());
     bool MTD = (tv->pt() > 0.9) && (fabs(tv->eta()) < 2.7);
+
+    bool good_timing = tv->has_timing() && (tv->timeQuality() >= min_timing_quality);
 
     // (index of) the sim vertex this track has been matched to (or NOT_MATCHED_TK_SIM)
     unsigned int tk_sim = tracks.simevent_index_from_key(tv->key());
@@ -8748,14 +9671,17 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
         sum_pt_majority += wpt;  
         sum_nt_majority += 1.;
         sum_wt_majority += wt;
+	if(good_timing) sum_nt_timing_majority +=1;
       } else if (tk_sim == NOT_MATCHED_TK_SIM) {
         sum_pt_unmatched += wpt;
         sum_nt_unmatched += 1.;
         sum_wt_unmatched += wt;
+	if(good_timing) sum_nt_timing_unmatched +=1;
       } else {
         sum_pt_minority += wpt;
         sum_nt_minority += 1.;
         sum_wt_minority += wt;
+	if(good_timing) sum_nt_timing_minority +=1;
       }
   }
 
@@ -8771,7 +9697,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
   sum_pt = sum_pt_majority + sum_pt_minority + sum_pt_unmatched;
   sum_nt = sum_nt_majority + sum_nt_minority + sum_nt_unmatched;
   sum_wt = sum_wt_majority + sum_wt_minority + sum_wt_unmatched;
-
+  sum_nt_timing =  sum_nt_timing_majority + sum_nt_timing_minority + sum_nt_timing_unmatched;
   if (false && (sum_pt_majority == 0) && (sum_pt > 0)) {
     cout << "analyzeRecVertexComposition, vertex without majority tracks ?" << endl;
     cout << "z = " << v.z() << endl;
@@ -8813,6 +9739,13 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexComposition(std::map<std::string, TH
     Fill(h, "vtxtrkpurity", purity, v.is_signal());             // same as nt_majority_frac
     Fill(h, "vtxtrkpurityvsz", v.z(), purity, v.is_signal());    // average purity vs z
     Fill(h, "vtxtrkpurityvspu", npu, purity, v.is_signal());
+  }
+
+  if(sum_nt_timing > 0){
+    float timing_purity = sum_nt_timing_majority / sum_nt_timing;
+    Fill(h, "vtxtrktimingpurity", timing_purity, v.is_signal());
+    Fill(h, "vtxtrktimingpurityvsz", v.z(), timing_purity, v.is_signal());    // average purity vs z
+    Fill(h, "vtxtrktimingpurityvspu", npu, timing_purity, v.is_signal());
   }
 
   float sum_nt_m = sum_nt_majority + sum_nt_minority;
@@ -9002,7 +9935,8 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexTrackAssociation(std::map<std::strin
 /***************************************************************************************/
 void PrimaryVertexAnalyzer4PU::analyzeVertexMergeRateTP(std::map<std::string, TH1*>& h,
                                                         MVertexCollection& vertexes,
-                                                        vector<SimEvent>& simEvt,
+                                                        Tracks & tracks,
+							vector<SimEvent>& simEvt,
                                                         const string message)
 /***************************************************************************************/
 // definitions ?
@@ -9518,7 +10452,9 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
         double dz = vtxs.at(signalv).z() - vtxs.at(jv).z();
         if (vtxs[jv].is_real()) {
           Fill(h, "zdiffrecselsignalrealpu", std::abs(dz));
-          if(jv == 1) Fill(h, "zdiffrecselsignalrealpuidx1", std::abs(dz));
+	  double dzsim = simEvt.at(vtxs[jv].sim).z - simEvt.at(0).z;
+          Fill(h, "zdiffsimselsignalrealpu", std::abs(dzsim));
+          if(jv == 1) Fill(h, "zdiffrecselsignalrealpuidx1", std::abs(dzsim));
         } else {
           Fill(h, "zdiffrecselsignalfake", std::abs(dz));
           if (fabs(dz) < 0.0) {  // only useful at low pu
@@ -9541,7 +10477,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
           Fill(h, "zdiffrecselsignalreal", std::abs(dz));
           Fill(h, "zdiffrecselsignalreal-dzbin", std::abs(dz));
         } else {
-          Fill(h, "zdiffrecselsignalfake", std::abs(dz));
+          Fill(h, "zdiffrecselsignalfakev2", std::abs(dz));
           Fill(h, "zdiffrecselsignalfake-dzbin", std::abs(dz));
         }
       }
@@ -9756,6 +10692,11 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
           Fill(h, "zdiffsimfound4TP", deltazsim);
           if (ev1 == simEvt.begin()) {
             Fill(h, "zdiffsimfound4SignalTP", deltazsim);
+	  }
+	}
+        if ((ev2->ndof > 4.) && (ev1->ndof > 4.)) {
+          if (ev1 == simEvt.begin()) {
+            Fill(h, "zdiffsimfoundselSignalTP", std::abs(deltazsim));
           }
         }
         double deltazrec = ev2->zrec - ev1->zrec;
@@ -9812,7 +10753,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionTP(std::map<std::string, T
       }
     }
   }
-}//analyzeVertexCollectionTP
+  }//analyzeVertexCollectionTP
 /***************************************************************************************/
 
 
@@ -10282,6 +11223,7 @@ void PrimaryVertexAnalyzer4PU::analyzeVertexCollectionReco(std::map<std::string,
     if ( tk.selected() ){
 
       fillTrackHistos(h, "trksel", tk, pv0_ptr);
+      if((tk.has_timing()) && (tk.timeQuality()>0.8)) {fillTrackHistos(h, "trkseltiming", tk, pv0_ptr);}
       // high pt track category
       if (abs(tk.pt()) > trkhiptmin_){
 	  fillTrackHistos(h, "trkselhipt", tk);
