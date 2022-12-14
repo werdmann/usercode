@@ -1,12 +1,16 @@
-
-
 import FWCore.ParameterSet.Config as cms
 import FWCore.PythonUtilities.LumiList as LumiList
 
+
+
 from Configuration.StandardSequences.Eras import eras
+
+from RecoVertex.PrimaryVertexProducer.TkClusParameters_cff import DA_vectParameters
 
 import sys, os
 import subprocess, shlex
+
+# run 4 full event, including timing
 
 # cmsRun cfg/ttbar_cfg.py debug=1:7659:-1.4364:0.1 uniquetrkweight=-0.8
 
@@ -15,6 +19,8 @@ def root_path(f):
     # prefers the local version if there is one
     if os.path.exists( "/pnfs/psi.ch/cms/trivcat/store/user/werdmann" + f):
         return "root://t3dcachedb.psi.ch:1094///pnfs/psi.ch/cms/trivcat/store/user/werdmann" + f
+    elif f.startswith("/eos/cms/store"):
+        return "root://cms-xrd-global.cern.ch//"+ f[len("/eos/cms/"):]
     else:
         return "root://xrootd-cms.infn.it/" + f
 
@@ -31,10 +37,13 @@ zdumpwidth = 100.
 use_tp = True
 use_hlt = False
 use_2file_solution = False
-use_lumiInfo = False  # FIXME make this configurable
+use_lumiInfo = False
 
 json = "goodList.json"
-era = "Run3"  # or Phase2 or Run2_2018,  see eras.__dict__.keys()
+era = "Phase2"  # or Phase2 or Run2_2018,  see eras.__dict__.keys()
+geometry = ""
+globaltag = ""
+source_files = ()
 secondary_files =  None #cms.untracked.vstring("")
 
 # twofile solutions
@@ -43,40 +52,37 @@ f2 = {}
 
 
 # the labels will be overridden when pvreco is done:
-trkTimesLabel = "tofPID:t0safe"          #  
-trkTimeResosLabel = "tofPID:sigmat0safe"
-#trkTimesLabel = "trackExtenderWithMTD:tmtd" 
-#trkTimeResosLabel = "trackExtenderWithMTD:sigmatmtd"
+#trkTimesLabel = "tofPID:t0safe"          #  
+#trkTimeResosLabel = "tofPID:sigmat0safe"
+trkTimesLabel = "trackExtenderWithMTD:tmtd" 
+trkTimeResosLabel = "trackExtenderWithMTD:sigmatmtd"
 
 #vcollections = ["offlinePrimaryVertices", "offlinePrimaryVerticesWithBS"]
+#vcollections = ["offlinePrimaryVertices","offlinePrimaryVerticesWithBS","offlineMultiPrimaryVertices","offlineMultiPrimaryVertices:WithBS"]
+vcollections = ["offlinePrimaryVertices","offlineMultiPrimaryVertices"]
 
-#miniaod stuff
-vcollections = ["offlineSlimmedPrimaryVertices", "offlineSlimmedPrimaryVertices4D"]
-#++patPackedCandidates "lostTracks" "" "RECO" (productId = 4:2058)
-#++patPackedCandidates "lostTracks" "eleTracks" "RECO" (productId = 4:2059)
-#++patPackedCandidates "packedPFCandidates" "" "RECO" (productId = 4:2060)
-#++patPackedGenParticles "packedGenParticles" "" "RECO" (productId = 4:2066)
 
 parameters={  # can be overwritten by arguments of the same name
   "4D": cms.untracked.bool(False),
+  "refit": cms.untracked.bool(False),
   "selNdof": cms.untracked.double(4.0),
   "selNdofWithBS": cms.untracked.double(2.0),
 #  "splitmethod":cms.untracked.int32(0),
   "usefit":cms.untracked.bool(False),
-  "use_tp":cms.untracked.bool(False),
+#  "use_tp":cms.untracked.bool(False),
   "use2file":cms.untracked.bool(False),
 #  "ptrunc":cms.untracked.double(1.e-50),
   "fill_track_histos":cms.untracked.bool(False),
   "fplo":cms.untracked.double(0),
   "chi2cutoff":cms.double(2.5), 
-  "verboseAnalyzer":cms.untracked.bool(False),
-  "verboseProducer":cms.untracked.bool(False),
+  "verboseAnalyzer":cms.untracked.bool(True),
+  "verboseProducer":cms.untracked.bool(True),
   "verboseClusterizer":cms.untracked.bool(False),
   "verboseClusterizer2D":cms.untracked.bool(False),
   "zdumpcenter" : cms.untracked.double(0.0),
   "zdumpwidth" : cms.untracked.double(20.0),
   "reco":cms.untracked.bool(False),
-  "miniaod":cms.untracked.bool(True),
+  "miniaod":cms.untracked.bool(False),
   "autodump":cms.untracked.int32(0),
   "nDump":cms.untracked.int32(0),
   "nDumpTracks":cms.untracked.int32(0),
@@ -120,6 +126,8 @@ parameters={  # can be overwritten by arguments of the same name
   "use_pt" : cms.untracked.int32(0)
 }
 
+print("This is pvm_cfg.py")
+
 # temporary fix, should not be needed
 args=[]
 for a in sys.argv:
@@ -141,7 +149,7 @@ for a in args:
 
     elif key == "input":
 
-        print("processing input directive, value=",value)
+        print( "processing input directive, value=",value)
         inputfile = value
         if inputfile.endswith(".root"):
             files = [inputfile]
@@ -156,10 +164,17 @@ for a in args:
     elif key == "era":
         era = value
 
+    elif key == "geometry":
+        geometry = value
+
+    elif key == "globaltag":
+        globaltag = value
+
     elif key == "4D":
         parameters["4D"] = cms.untracked.bool(value == "True")
-        #if (value=="True"):
-        #    vcollections.append("offlinePrimaryVertices4D")
+        if (value=="True"):
+            pass
+            #vcollections.append("offlinePrimaryVertices4D")
         #    era = "Phase2"
 
     elif key == "redopv" or key == "redoPV":
@@ -208,7 +223,7 @@ for a in args:
         info  = value
     elif key in parameters.keys():
         typename = parameters[key].configTypeName()
-        print (key, value, type(parameters[key]),"'%s'"%typename)
+        print( key, value, type(parameters[key]),"'%s'"%typename)
         if typename == "double":
             parameters[key] = cms.double( float(value) )
         elif type(parameters[key])==type(cms.string("")):
@@ -224,44 +239,35 @@ for a in args:
         elif typename == "untracked bool":
             parameters[key] = cms.untracked.bool( value == "True")
     else:
-        print("!! pvt_cfg.py  :  unknown key ",key)
+        print( "!! pvt_cfg.py  :  unknown key ",key)
 
 
 if use_2file_solution and len(files) > 0:
     fpath = "/store" + files[0].split("/store")[-1]
-    raw_files = subprocess.check_output(shlex.split('dasgoclient -query="parent file=%s"' % fpath)).strip().split('\n')
-    secondary_files = cms.untracked.vstring([root_path(f) for f in raw_files])
-    #raw = []
-    #for f in raw_files:
-    #    if os.path.exists( "/pnfs/psi.ch/cms/trivcat/store/user/werdmann" + f):
-    #        raw.append("root://t3dcachedb.psi.ch:1094///pnfs/psi.ch/cms/trivcat/store/user/werdmann" + f)
-    #    else:
-    #        raw.append("root://xrootd-cms.infn.it" + f)
-    #secondary_files = cms.untracked.vstring([f for f in raw])
+    raw_files = subprocess.check_output(shlex.split('dasgoclient -query="parent file=%s"' % fpath)).strip().split(b'\n')
+    print( raw_files)
+    secondary_files = cms.untracked.vstring([root_path(f.decode('utf-8')) for f in raw_files])
 
-print("pvt_cfg.py")
-print("args           ",args)
-print("events         ",nevent)
-print("info           ",info)
-print("json           ",json)
-print("era            ",era)
-print("DO_VTX_RECO    ",DO_VTX_RECO)
-print("all parameters")
-
+print( "pvt_cfg.py")
+print( "args           ",args)
+print( "events         ",nevent)
+print( "info           ",info)
+print( "json           ",json)
+print( "era            ",era)
+print( "geometry       ",geometry)
+print( "globaltag      ",globaltag)
+print( "DO_VTX_RECO    ",DO_VTX_RECO)
+print( "all parameters")
+print( parameters)
 if len(source_files) == 0:
-    print("empty source file list!")
+    print( "empty source file list!")
 else:
-    print("source files = ",source_files)
-    print("secondary files = ", secondary_files)
+    print( "source files = ",source_files)
+    print( "secondary files = ", secondary_files)
 
 if era == "Phase2":
     process = cms.Process("RERECO", eras.Phase2)
     autotag = "auto:phase2_realistic"
-elif era == "Phase2C9":
-    process = cms.Process("RERECO", eras.Phase2C9)
-    autotag = "111X_mcRun4_realistic_T15_v1"  # according to Federico
-    autotag = "110X_mcRun4_realistic_v3"      # according to edmProvDump
-
 elif era == "Run3":
     process = cms.Process("RERECO", eras.Run3)
     #autotag = "111X_mcRun3_2021_realistic_v4"
@@ -274,7 +280,7 @@ elif era == "Run2_2018":
     autotag = "auto:run2_data"
     parameters["4D"] = cms.untracked.bool(False)
 else:
-    print("unknown era", era)
+    print( "unknown era", era)
     print( (era == "Run2_2018"), ">%s<"%era)
     sys.exit(1)
 # for auto: tags see $CMSSW_RELEASE_BASE/python/Configuration/AlCa/autoCond.py
@@ -311,13 +317,34 @@ if era.startswith("Run2"):
     process.load('Configuration.StandardSequences.GeometryDB_cff') #?
 elif era == "Run3":
     process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
-elif era== "Phase2":
+elif era == "Phase2" and geometry == "":
     process.load('Configuration.Geometry.GeometryExtended2026D76Reco_cff')  
-elif era== "Phase2C9":
-    process.load('Configuration.Geometry.GeometryExtended2026D49_cff')  
+elif geometry in ("D76", "T21"):
+    process.load('Configuration.Geometry.GeometryExtended2026D76Reco_cff')  
+elif geometry in ("D77", "T22"):
+    process.load('Configuration.Geometry.GeometryExtended2026D77Reco_cff')  
+elif geometry in ("D80", "T25"):
+    process.load('Configuration.Geometry.GeometryExtended2026D80Reco_cff')  
+elif geometry in ("D81", "T26"):
+    process.load('Configuration.Geometry.GeometryExtended2026D81Reco_cff')  
+elif geometry in ("D88",):
+    process.load('Configuration.Geometry.GeometryExtended2026D88Reco_cff')  
+elif geometry in ("D89", "T28"):
+    process.load('Configuration.Geometry.GeometryExtended2026D89Reco_cff')  
+elif geometry in ("D90", "T29"):
+    process.load('Configuration.Geometry.GeometryExtended2026D90Reco_cff')  
 
+print("*"*80,"\n use_tp",use_tp)
 
 if use_tp:
+    process.load("SimTracker.TrackAssociation.trackingParticleRecoTrackAsssociation_cfi")
+    process.theTruth = cms.Sequence(
+        process.tpClusterProducer *
+        process.quickTrackAssociatorByHits *
+        process.trackingParticleRecoTrackAsssociation
+    )
+if False:
+    # see https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideTrackMCTruth
     process.load("Validation.RecoTrack.TrackValidation_cff")
     process.theTruth = cms.Sequence(
         process.tpClusterProducer +
@@ -367,7 +394,13 @@ process.options = cms.untracked.PSet(
 
 
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, autotag, '')
+if globaltag == "":
+    print("using autotag ", autotag)
+    process.GlobalTag = GlobalTag(process.GlobalTag, autotag, '')
+else:
+    print("using globaltag ", globaltag)
+    process.GlobalTag = GlobalTag(process.GlobalTag, globaltag, '')
+
 
 if DO_VTX_RECO:
     trkTimesLabel = "tofPID4DnoPID:t0safe" # as opposed to "tofPID:t0safe" , only exist after pvreco
@@ -380,12 +413,12 @@ if DO_VTX_RECO:
 process.load("RecoVertex.Configuration.RecoVertex_cff")
 
 #if DO_VTX_RECO:
-    #process.caloTowerForTrk.hbheInput = 'reducedHcalRecHits:hbhereco'
-    #process.caloTowerForTrk.hoInput = 'reducedHcalRecHits:horeco'
-    #process.caloTowerForTrk.hfInput = 'reducedHcalRecHits:hfreco'
-    #process.caloTowerForTrk.ecalInputs = ['reducedEcalRecHitsEB', 'reducedEcalRecHitsEE']
+#    process.caloTowerForTrk.hbheInput = 'reducedHcalRecHits:hbhereco'
+#    process.caloTowerForTrk.hoInput = 'reducedHcalRecHits:horeco'
+#    process.caloTowerForTrk.hfInput = 'reducedHcalRecHits:hfreco'
+#    process.caloTowerForTrk.ecalInputs = ['reducedEcalRecHitsEB', 'reducedEcalRecHitsEE']
 
-print(process.vertexreco)
+print( process.vertexreco)
 
 process.ak4CaloJetsForTrk.srcPVs = 'unsortedOfflinePrimaryVertices'
 process.vertexreco.remove(process.generalV0Candidates)
@@ -394,94 +427,73 @@ process.vertexreco.remove(process.inclusiveVertexing)
 # modify the track filter if needed
 tkFilterParameters = process.unsortedOfflinePrimaryVertices.TkFilterParameters.clone()    
 
-print("original trackFilterParameters (z-clustering)")
-print(tkFilterParameters)
+print( "original trackFilterParameters (z-clustering)")
+print( tkFilterParameters)
 for par_name in ("maxNormalizedChi2", "minPixelLayersWithHits", 
                  "minSiliconLayersWithHits", "maxD0Significance",
                  "maxD0Error", "maxDzError", "minPt", "maxEta", "trackQuality"):
     try:
         default =  getattr(tkFilterParameters, par_name)
         if default != parameters[par_name]:
-            print("changing tkFilter parameter ", par_name, " from ", default, "  to ", parameters[par_name])
+            print( "changing tkFilter parameter ", par_name, " from ", default, "  to ", parameters[par_name])
         setattr(tkFilterParameters, par_name, parameters[par_name])
     except ValueError:
-        print("pvx_cfg: attribute tkFilterParameters.", par_name , " not found ")
-
-if DO_VTX_RECO:
-    process.PV = cms.Path(process.vertexreco)
+        print( "pvm_cfg: attribute tkFilterParameters.", par_name , " not found ")
 
 
-    p = process.unsortedOfflinePrimaryVertices.TkClusParameters.TkDAClusParameters
-    print("original z clustering parameters")
-    print(p)
-    for par_name in ("zrange", "convergence_mode", "delta_lowT", 
-                     "Tmin", "Tpurge", "Tstop",
-                     "uniquetrkminp", "uniquetrkweight",
-                     "delta_highT", "vertexSize", "zmerge"):
-        try:
-            default =  getattr(p, par_name)
-            if default != parameters[par_name]:
-                print("changing TkDAClusParameters parameter ", par_name, " from ", default, "  to ", parameters[par_name])
-            setattr(p, par_name, parameters[par_name])
-        except AttributeError:
-            print("pvx_cfg: attribute TkDAClusParameters.", par_name , " not found ")
-            if par_name == "uniquetrkminp":  # FIXME, should not be needed in the future
-                setattr(p, par_name, parameters[par_name])
-                
-    # new/temp parameters
-    #for par_name in ("purge", "mergenotc", "mergeafterpurge","fillzmerge","rho0mode"):
-    #    setattr(p, par_name, parameters[par_name])
-    #    print "adding TkDAClusParameters parameter ", par_name ," = ", parameters[par_name]
-            
+process.offlineMultiPrimaryVertices = cms.EDProducer(
+    "PrimaryVertexProducer",
 
-    p = process.unsortedOfflinePrimaryVertices.vertexCollections[0]
-    for par_name in ("minNdof",):
-        try:
-            default =  getattr(p, par_name)
-            if default != parameters[par_name]:
-                print("changing Vtx parameter ", par_name, " from ", default, "  to ", parameters[par_name])
-            setattr(p, par_name, parameters[par_name])
-        except AttributeError:
-            print("attribute Vtx Parameters.", par_name , " not found ")
-
-
-    process.unsortedOfflinePrimaryVertices.verbose = parameters["verboseProducer"]
-    process.unsortedOfflinePrimaryVertices.TkFilterParameters = tkFilterParameters.clone()
-
-
-
-    # same for 4d vertices?
-    tkFilterParameters4D = process.unsortedOfflinePrimaryVertices4D.TkFilterParameters.clone()
-    print("original 4d track filter parameters")
-    print(tkFilterParameters4D )
-    print("currently not changed")
-
-    p = process.unsortedOfflinePrimaryVertices4D
-    print("original 4d clustering parameters")
-    print(p)
-    print(p.TkClusParameters)
-    #p.TkFilterParameters = tkFilterParameters4D.clone()
+    verbose = cms.untracked.bool(True),
+    TrackLabel = cms.InputTag("generalTracks"),
+    beamSpotLabel = cms.InputTag("offlineBeamSpot"),
     
-    #for p0 in (process.unsortedOfflinePrimaryVertices4DnoPID, process.unsortedOfflinePrimaryVertices4D):
-    for p0 in ():
-        print(p0)
-        p0.verbose = parameters["verboseProducer"]
+    TkFilterParameters = tkFilterParameters,
 
-        p = p0.TkClusParameters.TkDAClusParameters
-        for par_name in ("zrange", "convergence_mode", "delta_lowT", 
-                         "Tmin", "Tpurge", "Tstop",
-                         "uniquetrkminp", "uniquetrkweight",
-                         "delta_highT", "vertexSize", "zmerge"):
-            try:
-                default =  getattr(p, par_name)
-                if default != parameters[par_name]:
-                    print("changing 4D TkDAClusParameters parameter ", par_name, " from ", default, "  to ", parameters[par_name])
-                    setattr(p, par_name, parameters[par_name])
-            except AttributeError:
-                print("pvx_cfg: attribute TkDAClusParameters.", par_name , " not found ")
+    TkClusParameters = DA_vectParameters,
+    
+    vertexCollections = cms.VPSet([
+        cms.PSet(label=cms.string(""),
+               algorithm=cms.string("MultiPrimaryVertexFitter"),
+               chi2cutoff = cms.double(2.5),
+               minNdof=cms.double(0.0),
+               useBeamConstraint = cms.bool(False),
+               maxDistanceToBeam = cms.double(1.0)
+               )#,
+        #cms.PSet(label=cms.string("WithBS"),
+        #       algorithm=cms.string("MultiPrimaryVertexFitter"),
+         #      chi2cutoff = cms.double(2.5),
+         #      minNdof=cms.double(0.0),
+         #      useBeamConstraint = cms.bool(True),
+         #      maxDistanceToBeam = cms.double(1.0)
+         #      )      
+    ]),
+    vertexTimeParameters = cms.PSet(
+        algorithm = cms.string("fromTracksPID")
+    ),
+    isRecoveryIteration = cms.bool(False),
+    recoveryVtxCollection = cms.InputTag("")
+)
 
-        #p.TkClusParameters.TkDAClusParameters.zdumpcenter = parameters["zdumpcenter"]
-        #p.TkClusParameters.TkDAClusParameters.zdumpwidth = parameters["zdumpwidth"]
+
+process.MPV = cms.Path(process.offlineMultiPrimaryVertices)
+
+p = process.offlineMultiPrimaryVertices.TkClusParameters.TkDAClusParameters
+print( "original z clustering parameters")
+print( p)
+for par_name in ("zrange", "convergence_mode", "delta_lowT", 
+                 "Tmin", "Tpurge", "Tstop", "coolingFactor",
+                 "uniquetrkminp", "uniquetrkweight",
+                 "delta_highT", "vertexSize", "zmerge"):
+    try:
+        default =  getattr(p, par_name)
+        if default != parameters[par_name]:
+            print( "changing TkDAClusParameters parameter ", par_name, " from ", default, "  to ", parameters[par_name])
+            setattr(p, par_name, parameters[par_name])
+    except AttributeError:
+        print( "pvm_cfg: attribute TkDAClusParameters.", par_name , " not found ")
+        if par_name == "uniquetrkminp":  # FIXME, should not be needed in the future
+            setattr(p, par_name, parameters[par_name])
 
 
     
@@ -492,6 +504,7 @@ if DO_VTX_RECO:
 process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     info=  cms.untracked.string(info),
     f4D = parameters["4D"],
+    frefit = parameters["refit"],
     selNdof = parameters["selNdof"],                                    
     selNdofWithBS = parameters["selNdofWithBS"],                                    
     beamSpot = cms.InputTag('offlineBeamSpot'),
@@ -505,7 +518,7 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     nDump = parameters["nDump"],
     nDumpTracks = parameters["nDumpTracks"],
     RECO = parameters["reco"],
-    MINIAOD = parameters["miniaod"],                                           
+    MINIAOD = parameters["miniaod"],
     use_tp = cms.untracked.bool(use_tp),
     fill_track_histos = parameters["fill_track_histos"],
     track_timing = cms.untracked.bool(True),
@@ -522,7 +535,7 @@ process.oldVertexAnalysis = cms.EDAnalyzer("PrimaryVertexAnalyzer4PU",
     vertexAssociator = cms.untracked.InputTag("VertexAssociatorByPositionAndTracks"),
     lumiInfoTag = cms.untracked.InputTag("LumiInfo", "brilcalc"),
     useVertexFilter = cms.untracked.bool(False),
-    compareCollections = cms.untracked.int32(0),
+    compareCollections = cms.untracked.int32(1),
     vertexRecoCollections = cms.VInputTag(vcollections)
 )
 
@@ -558,28 +571,29 @@ process.genHTFilter = cms.EDFilter("GenHTFilter",
 )
 
 
+print( "============================================+")
+
 if use_tp and not use_genHTFilter:
+    print ("using tracking particles, no genHTFilter")
     process.analyze =  cms.Path( process.theTruth * process.oldVertexAnalysis )
 elif use_tp and use_genHTFilter:
-    print("using genHTFilter")
+    print( "using genHTFilter")
     process.analyze =  cms.Path( process.genHTFilter * process.theTruth * process.oldVertexAnalysis )
 elif use_hlt:
-    print("using hlt seletion")
+    print( "using hlt seletion")
     process.analyze =  cms.Path( process.LumiInfo * process.hltSelection * process.oldVertexAnalysis )
-elif use_lumiInfo:
-    print("no filters, no tp")
-    process.analyze =  cms.Path( process.LumiInfo * process.oldVertexAnalysis )
 else:
-    print("no filters, no tp, no lumi")
-    process.analyze =  cms.Path( process.oldVertexAnalysis )
+    print( "no fiters, no tp")
+    process.analyze =  cms.Path( process.LumiInfo * process.oldVertexAnalysis )
 
 
-
-print("=============================================")
-print(process.source)
-print("=============================================")
+print( "=============================================")
+print( process.source)
+print( "=============================================")
 
 if False:
+
+    # only dump event content, don't run the analyzer
     process.content = cms.EDAnalyzer("EventContentAnalyzer")
     process.dump = cms.Path(process.content)
     process.schedule = cms.Schedule(process.dump)
@@ -589,8 +603,10 @@ else:
     # Schedule definition
     if DO_VTX_RECO:
         # Schedule definition
-        print("running vertex reco and analysis, last message from pvx_cfg")
-        process.schedule = cms.Schedule(process.PV, process.analyze)
+        print( "running vertex reco and analysis, last message from pvm_cfg")
+        #process.schedule = cms.Schedule(process.PV, process.dump,process.analyze) 
+        process.schedule = cms.Schedule(process.PV, process.analyze) 
     else:
-        print("running analysis only, last message from pvx_cfg")
-        process.schedule = cms.Schedule(process.analyze)
+        print( "running analysis only, last message from pvm_cfg")
+        #process.schedule = cms.Schedule(process.MPV, process.dump, process.analyze)
+        process.schedule = cms.Schedule(process.MPV, process.analyze)

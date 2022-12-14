@@ -359,7 +359,7 @@ public:
     std::vector<MTrack> rtkprimsel;       // all selected MTracks matched to this simevent that pass the ip/sigma(ip) < 4 cut (rec wrt beam) ?????
     std::vector<unsigned int> trkidx;        // list of MTrack indices, used anywhere?
 
-    double Tc, chisq, dzmax, dztrim, m4m2;  // filled by getSimEvents via "getTc"
+    double Tc, chisq, dzmax, dztrim;        // filled by getSimEvents via "getTc"
     double sumpt2, sumpt;                   // filled by getSimEvents
     
     
@@ -376,13 +376,14 @@ public:
     double sumwnt;                          // sum of weighted tracks
 
 
-    // index of matched rec vertex or NOT_MATCHED_VTX_REC
+
     unsigned int rec;
+    // index of matched rec vertex or NOT_MATCHED_VTX_REC
     unsigned int matchQuality;
     double zrec;
     double ndof;
 
-    bool matched() const { return (rec != NOT_MATCHED_VTX_REC); }
+    bool is_matched() const { return (rec != NOT_MATCHED_VTX_REC); }
     bool is_signal() const { return (index == 0); }
 
 
@@ -476,7 +477,7 @@ public:
       return vtx;  // this is often, but not necessarily the matched vertex
     }
 
-    bool was_found(double min_ndof = 0.) { return (rec != NOT_MATCHED_VTX_REC) && (ndof > min_ndof); }
+    bool was_found(double min_ndof = 0.) { return (rec != NOT_MATCHED_VTX_REC) && (ndof > min_ndof); } //hmmm, never used?
 
     void clear_matching_info(){
       rec = NOT_MATCHED_VTX_REC;
@@ -486,7 +487,7 @@ public:
 
       wos.clear();
       sumwos = 0.;
-      nwosmatch = 0;
+      nwosmatch = 0;              // FIXME, this should be the size of  wos_dominated_recv, make it a function
       wos_dominated_recv.clear();
 
       wnt.clear();
@@ -654,6 +655,15 @@ public:
     float trackWeight (MTrack const * tk)const { return weights.at(tk->key());};
     float trackWeight (MTrack const & tk)const { return weights.at(tk.key());};
 
+    unsigned int countTruthMatchedTracks(const double min_weight = 0) const{ // replace getTruthMatchedVertexTracks
+      if(isRecoFake()) return 0;
+      unsigned int ntk = 0;
+      for(auto tk : tracks){
+	if( (trackWeight(tk) > min_weight) && (tk->is_matched()) ){ntk++;}
+      }
+      return ntk;
+    }
+
     bool has_timing() const {return (t() != 0) && (tError()>0.) && (tError()<9.) ;};// FIXME improve
 
 
@@ -684,7 +694,7 @@ public:
 
     bool is_real() const{ return (matchQuality > 0) && (matchQuality < 99); }
 
-    bool is_fake() const{ return (matchQuality <= 0) || (matchQuality >= 99); }  // not to be confused with isFake (find better names)
+    bool is_fake() const{ return (matchQuality <= 0) || (matchQuality >= 99); }  // not to be confused with isRecoFake
 
     bool is_signal() const{ return (sim == 0); }
 
@@ -702,7 +712,7 @@ public:
       wos.clear();
       wnt.clear();
       wosmatch = NOT_MATCHED_VTX_SIM;
-      wntmatch =  NOT_MATCHED_VTX_SIM;
+      wntmatch = NOT_MATCHED_VTX_SIM;
       sumwos = 0;
       sumwnt = 0;
       maxwos = 0.;
@@ -766,7 +776,18 @@ public:
     MVertex& at(const unsigned int i){ return vtxs.at(i); }
     MVertex& operator[] (const unsigned int i){ return vtxs.at(i); }
     const MVertex& operator() (const unsigned int i){ return vtxs.at(i); }const 
-    unsigned int size() const{ return vtxs.size();}
+    unsigned int size() const{return vtxs.size();}
+    unsigned int nvtx() const{  // correct for a possible unphysical dummy vertex at the end of the list
+      if(vtxs.size()==0){
+	return 0;
+      }else{
+	if( vtxs.at(vtxs.size()-1).isRecoFake() ){
+	  return vtxs.size()-1;
+        }else{
+          return vtxs.size();
+       }
+      }
+    }
     std::vector<MVertex>::iterator begin(){return vtxs.begin();}
     std::vector<MVertex>::iterator end(){return vtxs.end();}
    
@@ -1019,7 +1040,7 @@ public:
     }
 
    // the following fields require MC truth
-    bool matched() const {return _matched != NOT_MATCHED_TK_SIM;}
+    bool is_matched() const {return _matched != NOT_MATCHED_TK_SIM;}
     bool is_primary () const {return _is_primary;}
     double zsim () const {return _zsim;}
     double tsim () const {return _tsim;}
@@ -1029,21 +1050,21 @@ public:
     double zpull () const {return (_z - _zsim) / _dz;}
 
     bool is_muon () const {
-      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 13));
+      return (is_matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 13));
     }
     
     bool is_pion () const {
-      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 211));
+      return (is_matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 211));
     }
     
     bool is_kaon () const {
-      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 321));
+      return (is_matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 321));
     }
     bool is_proton () const {
-      return (matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 2212));
+      return (is_matched() && (!_tpr.isNull()) && (abs(_tpr->pdgId()) == 2212));
     }
     double get_particle_mass () const {
-      if (matched() &&  (!_tpr.isNull())){
+      if (is_matched() &&  (!_tpr.isNull())){
 	return _tpr->mass();
       }else{
 	return 0;
@@ -1184,7 +1205,7 @@ public:
 
     unsigned int simevent_index_from_key(const unsigned int key) {
       MTrack& tk = from_key(key);
-      if (tk.matched()){
+      if (tk.is_matched()){
 	return tk._simEvt->index;
       }else{
 	return NOT_MATCHED_TK_SIM;
@@ -1260,6 +1281,7 @@ public:
   void dumpEventSummary(std::vector<SimEvent>&, Tracks & );
   
   void analyzeTracksTP(Tracks& tracks, std::vector<SimEvent>& simEvt);
+  void testTrackParameters(Tracks& tracks);
 
 private:
 
@@ -1277,7 +1299,7 @@ private:
                                            edm::Handle<edm::SimVertexContainer>& simVtcs,
                                            double simUnit = 1.0);
   std::vector<SimPart> getSimTrkParameters(const edm::Handle<reco::GenParticleCollection>);
-  void getTc(const std::vector<MTrack>&, double&, double&, double&, double&, double&);
+  void getTc(const std::vector<MTrack>&, double&, double&, double&, double&);
 
   double vertex_pxy(const reco::Vertex&);
   double vertex_sumw(const reco::Vertex&);
@@ -1552,7 +1574,7 @@ private:
   bool get_reco_and_transient_tracks(const edm::EventSetup&, const edm::Event&, Tracks&);
   bool get_miniaod_tracks(const edm::EventSetup&, const edm::Event&, const std::string &, Tracks&);
   void add_timing_to_vertex_collection(const std::string & label, Tracks& tracks);
-  void refit_recvertices_after_timing(Tracks&);
+  void refit_recvertices_after_timing(Tracks&, double min_tk_vtx_weight=0.5);
   void fill_track_to_vertex_pointers(Tracks&);
 
   double muvtx(double z);
@@ -1618,8 +1640,8 @@ private:
 
 
   Int_t getAssociatedRecoTrackIndex(const edm::Handle<reco::TrackCollection>& recTrks, TrackingParticleRef tpr);
-  bool truthMatchedTrack(const edm::RefToBase<reco::Track>, TrackingParticleRef&)const;
-  std::vector<edm::RefToBase<reco::Track> > getTruthMatchedVertexTracks(const reco::Vertex&, double min_weight = 0.5) const;
+  bool select_truthMatchedTrack(const edm::RefToBase<reco::Track>, TrackingParticleRef&)const;
+  std::vector<edm::RefToBase<reco::Track> > getTruthMatchedVertexTracks_obsolete(const reco::Vertex&, double min_weight = 0.5) const;
   void printTruthMatchValues(edm::RefToBase<reco::Track> track);
 
 
@@ -1644,6 +1666,11 @@ private:
   std::vector<PrimaryVertexAnalyzer4PU::SimEvent> getSimEvents_miniaod(
 								       const edm::Event &, 
 								       Tracks&);
+
+void analyzeVertexCollectionZmatching(std::map<std::string, TH1*>& h,
+								MVertexCollection& vtxs,
+								std::vector<SimEvent>& simEvts,
+								const std::string message);
 
   void analyzeVertexRecoCPUTime(std::map<std::string, TH1*>& h,
                                 const reco::VertexCollection* recVtxs,
@@ -1977,6 +2004,7 @@ private:
   double selNdof_;
   double selNdofWithBS_;
   double selNdofNoBS_;
+  double min_trk_in_vtx_weight_;
   double ndof0trk_;
   double trkcentraletamax_;
   double trkloptmax_;
