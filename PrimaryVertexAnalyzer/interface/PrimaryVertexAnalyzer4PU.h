@@ -135,7 +135,25 @@ class PrimaryVertexAnalyzer4PU : public edm::one::EDAnalyzer<> {
 public:
   class SimPart {
   public:
-    SimPart(){simpvidx=0;rec=NOT_MATCHED_TK_REC;};// only for backwards compatibility, eventually get rid of this constructor
+    SimPart(){
+      // only for backwards compatibility, eventually get rid of this constructor
+      simpvidx=0;
+      rec=NOT_MATCHED_TK_REC;
+      type = 0;
+      pdg = 0;
+      xvtx = 0;
+      yvtx = 0;
+      zvtx = 0;
+      tvtx = 0;
+      charge = 0;
+      pt = 0;
+      phi = 0;
+      eta = 0;
+      ldec = 0;
+      ddcap = 0;
+      zdcap = 0;
+      par = ParameterVector(0,0,0,0,0);
+    };
     SimPart(int evt0, int type0, int pdgCode, double x1, double y1, double z1, double t1, double px1, double py1, double pz1, double BfieldT){
       // x0,y0,z0 should be the production point relative to the beam spot coordinates
       simpvidx = evt0;
@@ -148,6 +166,9 @@ public:
       set_charge(pdg);
       set_trkpar_c(charge, x1, y1, z1, px1, py1, pz1, BfieldT);
       rec = NOT_MATCHED_TK_REC;
+      ldec = 0;
+      ddcap = 0;
+      zdcap = 0;
     };
     
     SimPart(unsigned int evt0, bool is_prompt, double x0, double y0, double z0, const pat::PackedGenParticle & cand, double BfieldT){
@@ -163,6 +184,9 @@ public:
       yvtx = y0;
       zvtx = z0;
       tvtx = 0;
+      ldec = 0;
+      ddcap = 0;
+      zdcap = 0;
       set_charge(pdg);
       if(charge != cand.charge()) {
 	std::cout << "charge mismatch for pdg " << cand.pdgId() <<  " " << charge <<  "<> " << cand.charge() << std::endl;
@@ -300,6 +324,7 @@ public:
 
   // forward declarations
   class MTrack;
+  class MVertex;
   class Tracks;
 
   // a class holding simulated events
@@ -377,8 +402,9 @@ public:
 
 
 
-    unsigned int rec;
-    // index of matched rec vertex or NOT_MATCHED_VTX_REC
+    unsigned int rec;      // index of matched rec vertex or NOT_MATCHED_VTX_REC
+    std::map<std::string, unsigned int> _recv;  // per collection, better switch to this
+
     unsigned int matchQuality;
     double zrec;
     double ndof;
@@ -422,7 +448,7 @@ public:
       return false;
     }
 
-    int countVertexTracks(const reco::Vertex& v, double min_weight = 0.5) {
+    int countVertexTracks(const reco::Vertex& v, double min_weight = 0.5) {// see also min_trk_in_vtx_weight_
       // count the number of tracks from this simevent in recvertex v
       int n = 0;
       for (trackit_t t = v.tracks_begin(); t != v.tracks_end(); t++) {
@@ -436,6 +462,10 @@ public:
         }
       }
       return n;
+    }
+
+    int countVertexTracks(const MVertex & v, double min_weight = 0.5) {
+      return countVertexTracks(v.recovertex());
     }
 
     int countVertexTracksMTD(const reco::Vertex& v, double min_weight = 0.5) {
@@ -633,6 +663,8 @@ public:
     double yError() const { return recvtx->yError();};
     double zError() const { return recvtx->zError();};
     double tError() const { return recvtx->tError();};
+    double xyCorrelation() const { return recvtx->covariance(0,1) / sqrt(recvtx->covariance(0,0) * recvtx->covariance(1,1));};
+    double covariance(const int i, const int j) const { return recvtx->covariance(i,j);};
     double chi2() const {return recvtx->chi2();};
 
     const reco::Vertex & recovertex() const{  // get a reference of the reco::Vertex
@@ -993,6 +1025,8 @@ public:
     double dz () const {return _dz;}; // obsolete
     double dzError () const {return _dz;};
     double pt () const {return _pt;}
+    double px () const {return _pt * cos(_phi);}
+    double py () const {return _pt * sin(_phi);}
     double eta () const {return _eta;}
     double phi () const {return _phi;}
     double ip () const {return _ip;}
@@ -1340,6 +1374,7 @@ private:
     const bool no_tracks_with_timing(){ return status==2;}
     const bool not_converged(){ return status==3;}
   };
+
     
   static Vertex_time_result vertex_time_from_tracks(const reco::Vertex&, Tracks& tracks, double minquality, bool verbose=false);
   static Vertex_time_result vertex_time_from_tracks_pid(const reco::Vertex&, Tracks& tracks, double minquality, bool verbose=false);
@@ -1365,6 +1400,8 @@ private:
 
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
+
+  bool uv_analysis(const MVertex & vtx, const SimEvent &, double & du, double & dv, double & uError, double & vError);
 
   void addn(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram in a subdirectory and use the subdirectory name in the map key
@@ -1720,6 +1757,7 @@ void analyzeVertexCollectionZmatching(std::map<std::string, TH1*>& h,
 
   void analyzeVertexComposition(std::map<std::string, TH1*>& h,
                                    MVertex & v,
+			           MVertexCollection & vtxs,
 				   Tracks& tracks,
                                    std::vector<SimEvent>& simEvt,
 				   float npu);
