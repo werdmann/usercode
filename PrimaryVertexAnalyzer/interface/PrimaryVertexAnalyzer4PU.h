@@ -465,7 +465,7 @@ public:
     }
 
     int countVertexTracks(const MVertex & v, double min_weight = 0.5) {
-      return countVertexTracks(v.recovertex());
+      return countVertexTracks(v.recovertex(), min_weight);
     }
 
     int countVertexTracksMTD(const reco::Vertex& v, double min_weight = 0.5) {
@@ -654,7 +654,7 @@ public:
     
     // some pass-through functions to the underlying reco::Vertex for convenience
     double ndof() const { return recvtx->ndof();};
-    bool isRecoFake() const { return recvtx->isFake();};
+    bool isRecoFake() const { return recvtx->isFake();};  //bool isFake() const { return (chi2_ == 0 && ndof_ == 0 && tracks_.empty()); }
     double x() const { return recvtx->position().x();};
     double y() const { return recvtx->position().y();};
     double z() const { return recvtx->position().z();};
@@ -1401,7 +1401,7 @@ private:
   bool select(const reco::Vertex&, const int level = 0);
   bool select(const MVertex&, const int level = 0);
 
-  bool uv_analysis(const MVertex & vtx, const SimEvent &, double & du, double & dv, double & uError, double & vError);
+  bool uv_analysis(const MVertex & vtx, const SimEvent &, double & du, double & dv, double & uError, double & vError, double &pol);
 
   void addn(std::map<std::string, TH1*>& h, TH1* hist) {
     // add a histogram in a subdirectory and use the subdirectory name in the map key
@@ -1705,10 +1705,11 @@ private:
 								       Tracks&);
 
 void analyzeVertexCollectionZmatching(std::map<std::string, TH1*>& h,
-								MVertexCollection& vtxs,
-								std::vector<SimEvent>& simEvts,
-								const std::string message);
-
+				      MVertexCollection& vtxs,
+				      std::vector<SimEvent>& simEvts,
+				      const std::string message,
+				      const double zwindow_sigmas = 3.0);
+  
   void analyzeVertexRecoCPUTime(std::map<std::string, TH1*>& h,
                                 const reco::VertexCollection* recVtxs,
                                 const std::string message = "");
@@ -1875,6 +1876,7 @@ void analyzeVertexCollectionZmatching(std::map<std::string, TH1*>& h,
   double simUnit_;
   double simtUnit_;
   double zmatch_;
+  double zwindow_sigmas_;
   int eventSummaryCounter_;
   int nEventSummary_;
   double zWosMatchMax_;  // cut-off for wos matching, relax for exotica
